@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Form, ListGroup, Stack } from 'react-bootstrap';
-import { getTemplateById, stationTemplates } from '../station-template/stationTemplates';
+import { stationTemplates } from '../station-template/stationTemplates';
 import { useParams } from 'react-router-dom';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';

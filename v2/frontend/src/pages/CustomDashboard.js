@@ -8,7 +8,7 @@ const STORAGE_KEY = 'mc_v2_dashboard_links';
 
 const CustomDashboard = () => {
   const navigate = useNavigate();
-  const { username, template, slug } = useParams();
+  const { template, slug } = useParams();
   const templateInfo = useMemo(() => getTemplateById(template), [template]);
   const [linkData, setLinkData] = useState(null);
   const [configData, setConfigData] = useState(null);

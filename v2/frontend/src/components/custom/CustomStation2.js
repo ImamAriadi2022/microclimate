@@ -300,22 +300,6 @@ const Station2 = ({ customConfig, customTitle }) => {
     return parsed.toString();
   };
 
-  const getSimulationApiUrl = () => {
-    if (customConfig && customConfig.type === 'backend') {
-      const base = customConfig.baseUrl.replace(/\/$/, '');
-      return `${base}${customConfig.endpointMap?.topic5History || '/petengoran/topic5/history'}`;
-    }
-
-    const primaryUrl = getApiUrl(filter);
-    if (!primaryUrl) return null;
-
-    try {
-      const parsed = new URL(primaryUrl);
-      return `${parsed.origin}/simulate/petengoran/topic4/history?limit=500`;
-    } catch (_error) {
-      return null;
-    }
-  };
 
   const fetchJsonOrThrow = async (url) => {
     const response = await fetch(url);
@@ -500,7 +484,7 @@ const Station2 = ({ customConfig, customTitle }) => {
     } else {
       setRealtimeGaugeData(EMPTY_GAUGE_DATA);
     }
-  }, [allData, filter, startDateTime, endDateTime]);
+  }, [allData, filter, startDateTime, endDateTime, customConfig]);
 
   useEffect(() => {
     if (gaugeMode === 'last-active' && lastActiveGaugeData) {

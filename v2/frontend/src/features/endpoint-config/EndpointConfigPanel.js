@@ -76,8 +76,8 @@ const EndpointConfigPanel = () => {
   const [clientResample, setClientResample] = useState('none');
 
   const template = useMemo(() => getTemplateById(templateId), [templateId]);
-  const requiredEndpoints = template.requiredEndpoints || [];
-  const requiredTopics = template.requiredTopics || [];
+  const requiredEndpoints = useMemo(() => template.requiredEndpoints || [], [template]);
+  const requiredTopics = useMemo(() => template.requiredTopics || [], [template]);
 
   useEffect(() => {
     const savedConfigs = localStorage.getItem(STORAGE_KEY);
@@ -102,7 +102,7 @@ const EndpointConfigPanel = () => {
       ...prev,
     }));
     setTestKey(requiredEndpoints[0].key);
-  }, [templateId]);
+  }, [templateId, requiredEndpoints]);
 
   useEffect(() => {
     if (requiredTopics.length === 0) return;
@@ -110,7 +110,7 @@ const EndpointConfigPanel = () => {
       ...buildEmptyMap(requiredTopics, 'key', 'defaultTopic'),
       ...prev,
     }));
-  }, [templateId]);
+  }, [templateId, requiredTopics]);
 
   const resetForm = () => {
     setEditingId('');

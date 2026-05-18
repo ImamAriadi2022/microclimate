@@ -1,7 +1,9 @@
+import { useParams } from 'react-router-dom';
 import { Card, ListGroup } from 'react-bootstrap';
 import { stationTemplates } from '../station-template/stationTemplates';
 
 const TemplatePage = () => {
+  const { username = 'user' } = useParams();
   return (
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
@@ -17,7 +19,7 @@ const TemplatePage = () => {
               <ListGroup.Item key={template.id}>
                 <div className="fw-semibold">{template.name}</div>
                 <div className="text-muted">{template.description}</div>
-                <div className="small text-muted">Base path: {template.basePath}</div>
+                <div className="small text-muted">Base path: /{username}/{template.id}</div>
               </ListGroup.Item>
             ))}
           </ListGroup>

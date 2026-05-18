@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Form, ListGroup, Stack } from 'react-bootstrap';
 import { getTemplateById, stationTemplates } from '../station-template/stationTemplates';
+import { useParams } from 'react-router-dom';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';
 const CONFIG_KEY = 'mc_v2_user_configs';
 const ACTIVE_CONFIG_KEY = 'mc_v2_active_config_id';
-const slugPattern = /^[a-z0-9-]{3,32}$/;
+const slugPattern = /^[a-z0-9-]{3,45}$/;
 
-const buildPreviewLink = (templateId, slug) => {
-  const template = getTemplateById(templateId);
-  return `${template.basePath}/${slug}`;
-};
+// We'll move buildPreviewLink inside the component to have access to username parameter
 
 const DashboardLinksPanel = () => {
+  const { username = 'user' } = useParams();
   const [links, setLinks] = useState([]);
   const [configs, setConfigs] = useState([]);
   const [activeConfigId, setActiveConfigId] = useState('');
@@ -23,6 +22,10 @@ const DashboardLinksPanel = () => {
   const [templateId, setTemplateId] = useState('station2');
   const [configId, setConfigId] = useState('');
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  const buildPreviewLink = (templateId, slug) => {
+    return `/${username}/${templateId}/${slug}`;
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -99,14 +102,17 @@ const DashboardLinksPanel = () => {
   const handleSubmit = (event) => {
     event.preventDefault();
     const cleanName = name.trim();
-    const cleanSlug = slug.trim().toLowerCase();
+    let cleanSlug = slug.trim().toLowerCase();
+    if (cleanSlug && !cleanSlug.endsWith('-microclimate')) {
+      cleanSlug = `${cleanSlug}-microclimate`;
+    }
 
     if (!cleanName) {
       setStatus({ type: 'danger', message: 'Nama dashboard wajib diisi.' });
       return;
     }
     if (!slugPattern.test(cleanSlug)) {
-      setStatus({ type: 'danger', message: 'Slug harus 3-32 karakter (a-z, 0-9, tanda hubung).' });
+      setStatus({ type: 'danger', message: 'Slug harus 3-45 karakter (a-z, 0-9, tanda hubung).' });
       return;
     }
     if (links.some((item) => item.slug === cleanSlug && item.id !== editingId)) {

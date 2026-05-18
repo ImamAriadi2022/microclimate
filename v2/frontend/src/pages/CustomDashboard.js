@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Container } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
-import Station2 from '../components/petengoran/Station2';
+import CustomStation2 from '../components/custom/CustomStation2';
 import { getTemplateById } from '../features/station-template/stationTemplates';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';
 
 const CustomDashboard = () => {
   const navigate = useNavigate();
-  const { template, slug } = useParams();
+  const { username, template, slug } = useParams();
   const templateInfo = useMemo(() => getTemplateById(template), [template]);
   const [linkData, setLinkData] = useState(null);
   const [configData, setConfigData] = useState(null);
@@ -49,7 +49,26 @@ const CustomDashboard = () => {
   }
 
   if (templateInfo?.id === 'station2') {
-    return <Station2 customConfig={configData} />;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <div style={{ flex: 1 }}>
+          <CustomStation2 customConfig={configData} customTitle={linkData?.name} />
+        </div>
+        <footer 
+          style={{ 
+            textAlign: 'center', 
+            padding: '15px', 
+            backgroundColor: '#ffffff', 
+            color: '#6c757d',
+            fontSize: '0.9rem',
+            borderTop: '1px solid #dee2e6',
+            boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
+          }}
+        >
+          Dashboard ini dibuat menggunakan platform <strong>Microclimate</strong>
+        </footer>
+      </div>
+    );
   }
 
   return (

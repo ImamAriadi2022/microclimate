@@ -29,7 +29,8 @@ const DataDownloadModal = ({
     interval: 15, // minutes
     method: 'mean', // mean, first, last, max, min
     fields: [], // fields to include
-    dateRange: 'all' // all, today, week, month
+    startDate: '', // start date for filtering
+    endDate: '' // end date for filtering
   });
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -56,33 +57,18 @@ const DataDownloadModal = ({
     }
   }, [data, fieldsToUse, downloadOptions.fields.length]);
 
-  // Filter data berdasarkan date range
-  const filterDataByDateRange = (data, range) => {
-    if (range === 'all') return data;
-    
-    const now = new Date();
-    let startDate;
-    
-    switch (range) {
-      case 'today':
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'week':
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'month':
-        startDate = new Date(now);
-        startDate.setMonth(startDate.getMonth() - 1);
-        break;
-      default:
-        return data;
+  // Filter data berdasarkan start dan end date
+  const filterDataByDateRange = (data) => {
+    let filtered = data;
+    if (downloadOptions.startDate) {
+      const start = new Date(downloadOptions.startDate);
+      filtered = filtered.filter(item => new Date(item.timestamp) >= start);
     }
-
-    return data.filter(item => {
-      const itemDate = new Date(item.timestamp);
-      return itemDate >= startDate && itemDate <= now;
-    });
+    if (downloadOptions.endDate) {
+      const end = new Date(downloadOptions.endDate);
+      filtered = filtered.filter(item => new Date(item.timestamp) <= end);
+    }
+    return filtered;
   };
 
   // Process data for download
@@ -91,7 +77,7 @@ const DataDownloadModal = ({
     
     try {
       // Filter by date range
-      let filteredData = filterDataByDateRange(data, downloadOptions.dateRange);
+      let filteredData = filterDataByDateRange(data);
       
       // Apply resampling if enabled
       if (downloadOptions.resample && filteredData.length > 0) {
@@ -203,19 +189,29 @@ const DataDownloadModal = ({
               </ButtonGroup>
             </Form.Group>
 
-            {/* Date Range */}
-            <Form.Group className="mb-3">
-              <Form.Label>Date Range</Form.Label>
-              <Form.Select
-                value={downloadOptions.dateRange}
-                onChange={(e) => handleOptionChange('dateRange', e.target.value)}
-              >
-                <option value="all">All Data</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last Month</option>
-              </Form.Select>
-            </Form.Group>
+            {/* Custom Date Range Picker */}
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Start Date & Time</Form.Label>
+                  <Form.Control
+                    type="datetime-local"
+                    value={downloadOptions.startDate}
+                    onChange={(e) => handleOptionChange('startDate', e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>End Date & Time</Form.Label>
+                  <Form.Control
+                    type="datetime-local"
+                    value={downloadOptions.endDate}
+                    onChange={(e) => handleOptionChange('endDate', e.target.value)}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
 
             {/* Resampling Options */}
             <Form.Group className="mb-3">

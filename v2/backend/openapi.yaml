@@ -1,0 +1,727 @@
+openapi: 3.1.0
+info:
+  title: Back Climate API - Frontend Friendly Docs
+  version: 1.5.0
+  description: |
+    Dokumentasi API untuk kebutuhan frontend Back Climate.
+
+    Ringkasan cepat:
+    - Semua endpoint station/topic menggunakan response yang konsisten: `{ result: SensorRecord[] }`.
+    - Endpoint `.../topic4/latest` mengembalikan data terbaru (1 record).
+    - Endpoint `.../topic5/latest` mengembalikan data terbaru Station 2 (1 record).
+    - Endpoint `.../topic4/history` mengembalikan history data terurut dengan pagination (`limit`/`offset`).
+    - Endpoint `.../station2/history` membaca langsung dari tabel `second_station`.
+    - Jika request terlalu banyak, API mengembalikan 429.
+
+    Mapping URL frontend (contoh):
+    - REACT_APP_API_PETENGORAN_GET_TOPIC4 -> /petengoran/topic4/history
+    - REACT_APP_API_PETENGORAN_GET_TOPIC5 -> /petengoran/topic5/history
+    - REACT_APP_API_DASHBOARD_GET_TOPIC4 -> /dashboard/topic4
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server (recommended for Swagger Try it out)
+  - url: https://api.example.com
+    description: Example production server
+
+tags:
+  - name: Petengoran
+    description: Data sensor terbaru untuk halaman/section Petengoran.
+  - name: Dashboard
+    description: Data sensor umum untuk ringkasan dashboard.
+  - name: System
+    description: Endpoint utilitas untuk memantau status layanan.
+  - name: Simulation
+    description: Endpoint simulasi data untuk frontend testing tanpa koneksi database.
+
+paths:
+  /petengoran/topic4:
+    get:
+      tags: [Petengoran]
+      summary: Legacy - Ambil history data topic4 Petengoran
+      deprecated: true
+      description: |
+        Endpoint lama untuk kompatibilitas frontend existing.
+        Perilaku sama dengan `/petengoran/topic4/history` dengan pagination.
+      operationId: getPetengoranTopic4Legacy
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil data sensor Petengoran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+              examples:
+                fullHistory:
+                  summary: History data Petengoran
+                  value:
+                    result:
+                      - timestamp: "28-03-26 10:30:00"
+                        humidity: 78.3
+                        temperature: 30.1
+                        AirPressure: 1009.8
+                        windSpeed: 4.2
+                        rainfall: 0
+                        angle: 135
+                        suhuAir: 28.4
+                        irradiation: 650.2
+                        bmpTemperature: 30.0
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/topic4/history:
+    get:
+      tags: [Petengoran]
+      summary: Ambil seluruh history data topic4 Petengoran
+      description: Mengembalikan history data sensor Petengoran dengan pagination, diurutkan dari terbaru ke terlama.
+      operationId: getPetengoranTopic4History
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil history data sensor Petengoran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+              examples:
+                historyPage:
+                  summary: History data halaman pertama
+                  value:
+                    result:
+                      - timestamp: "28-03-26 10:30:00"
+                        humidity: 78.3
+                        temperature: 30.1
+                        AirPressure: 1009.8
+                        windSpeed: 4.2
+                        rainfall: 0
+                      - timestamp: "28-03-26 10:25:00"
+                        humidity: 79.1
+                        temperature: 29.9
+                        AirPressure: 1010.1
+                        windSpeed: 4.0
+                        rainfall: 0
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/topic4/latest:
+    get:
+      tags: [Petengoran]
+      summary: Ambil data terbaru topic4 Petengoran
+      description: Mengembalikan 1 record data sensor paling baru dari Petengoran.
+      operationId: getPetengoranTopic4Latest
+      responses:
+        '200':
+          description: Berhasil mengambil data terbaru Petengoran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+              examples:
+                latest:
+                  summary: Satu record terbaru
+                  value:
+                    result:
+                      - timestamp: "28-03-26 10:30:00"
+                        humidity: 78.3
+                        temperature: 30.1
+                        AirPressure: 1009.8
+                        windSpeed: 4.2
+                        rainfall: 0
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/station1/history:
+    get:
+      tags: [Petengoran]
+      summary: Ambil history data Station 1 Petengoran
+      description: Endpoint utama Station 1 (setara data topic4) dengan pagination.
+      operationId: getPetengoranStation1History
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil history data Station 1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/station1/latest:
+    get:
+      tags: [Petengoran]
+      summary: Ambil data terbaru Station 1 Petengoran
+      description: Endpoint utama Station 1 untuk 1 record terbaru.
+      operationId: getPetengoranStation1Latest
+      responses:
+        '200':
+          description: Berhasil mengambil data terbaru Station 1
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/station2/history:
+    get:
+      tags: [Petengoran]
+      summary: Ambil history data Station 2 Petengoran
+      description: Endpoint utama Station 2 (topic5) dengan pagination. Data diambil langsung dari tabel `second_station`.
+      operationId: getPetengoranStation2History
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil history data Station 2
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/station2/latest:
+    get:
+      tags: [Petengoran]
+      summary: Ambil data terbaru Station 2 Petengoran
+      description: Endpoint utama Station 2 untuk 1 record terbaru.
+      operationId: getPetengoranStation2Latest
+      responses:
+        '200':
+          description: Berhasil mengambil data terbaru Station 2
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/topic5:
+    get:
+      tags: [Petengoran]
+      summary: Legacy - Ambil history data topic5 Petengoran
+      deprecated: true
+      description: |
+        Alias kompatibilitas untuk Station 2.
+        Perilaku sama dengan `/petengoran/topic5/history`.
+      operationId: getPetengoranTopic5Legacy
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil history data topic5 Petengoran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/topic5/history:
+    get:
+      tags: [Petengoran]
+      summary: Ambil seluruh history data topic5 Petengoran
+      description: Alias kompatibilitas untuk endpoint `/petengoran/station2/history`.
+      operationId: getPetengoranTopic5History
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil history data topic5 Petengoran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /petengoran/topic5/latest:
+    get:
+      tags: [Petengoran]
+      summary: Ambil data terbaru topic5 Petengoran
+      description: Alias kompatibilitas untuk endpoint `/petengoran/station2/latest`.
+      operationId: getPetengoranTopic5Latest
+      responses:
+        '200':
+          description: Berhasil mengambil data terbaru topic5 Petengoran
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /dashboard/topic4:
+    get:
+      tags: [Dashboard]
+      summary: Legacy - Ambil history data topic4 Dashboard
+      deprecated: true
+      description: |
+        Endpoint lama untuk kompatibilitas frontend existing.
+        Perilaku sama dengan `/dashboard/topic4/history` dengan pagination.
+      operationId: getDashboardTopic4Legacy
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil data dashboard topic4
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+              examples:
+                success:
+                  summary: Response sukses
+                  value:
+                    result:
+                      - timestamp: "28-03-26 10:30:00"
+                        humidity: 78.3
+                        temperature: 30.1
+                        AirPressure: 1009.8
+                        windSpeed: 4.2
+                        rainfall: 0
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /dashboard/topic4/history:
+    get:
+      tags: [Dashboard]
+      summary: Ambil seluruh history data topic4 Dashboard
+      description: Mengembalikan history data sensor Dashboard dengan pagination, diurutkan dari terbaru ke terlama.
+      operationId: getDashboardTopic4History
+      parameters:
+        - $ref: '#/components/parameters/PaginationLimit'
+        - $ref: '#/components/parameters/PaginationOffset'
+      responses:
+        '200':
+          description: Berhasil mengambil history data Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /dashboard/topic4/latest:
+    get:
+      tags: [Dashboard]
+      summary: Ambil data terbaru topic4 Dashboard
+      description: Mengembalikan 1 record data sensor paling baru dari Dashboard.
+      operationId: getDashboardTopic4Latest
+      responses:
+        '200':
+          description: Berhasil mengambil data terbaru Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultWrapper'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      tags: [System]
+      summary: Cek status service dan database
+      description: Endpoint untuk monitoring internal. Bukan untuk konsumsi data frontend utama.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                healthy:
+                  value:
+                    message: ok
+                    databases:
+                      petengoran: ok
+                      dashboard: ok
+        '503':
+          description: Service degraded (minimal satu database error)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                degraded:
+                  value:
+                    message: degraded
+                    databases:
+                      petengoran: error
+                      dashboard: ok
+
+  /simulate/{source}/topic4/latest:
+    get:
+      tags: [Simulation]
+      summary: Simulasi data terbaru topic4
+      description: Menghasilkan 1 data terbaru simulasi untuk source tertentu tanpa query ke database.
+      operationId: getSimulationTopic4Latest
+      parameters:
+        - $ref: '#/components/parameters/SimulationSource'
+      responses:
+        '200':
+          description: Simulasi latest berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResultWrapper'
+              examples:
+                simulatedLatest:
+                  value:
+                    result:
+                      - timestamp: "2026-04-02T12:00:00.000Z"
+                        humidity: 71.2
+                        temperature: 29.1
+                        AirPressure: 1009.1
+                        windSpeed: 2.2
+                        rainfall: 0
+                        angle: 91
+                        suhuAir: 28.2
+                        irradiation: 431
+                        bmpTemperature: 28.1
+                        direction: Simulated
+                    meta:
+                      mode: simulation
+                      source: petengoran
+                      type: latest
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /simulate/{source}/topic4/history:
+    get:
+      tags: [Simulation]
+      summary: Simulasi history data topic4
+      description: Menghasilkan data history simulasi tanpa query ke database. Cocok untuk uji tabel/chart frontend.
+      operationId: getSimulationTopic4History
+      parameters:
+        - $ref: '#/components/parameters/SimulationSource'
+        - $ref: '#/components/parameters/SimulationLimit'
+        - $ref: '#/components/parameters/SimulationOffset'
+      responses:
+        '200':
+          description: Simulasi history berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationResultWrapper'
+              examples:
+                simulatedHistory:
+                  value:
+                    result:
+                      - timestamp: "2026-04-02T12:00:00.000Z"
+                        humidity: 71.2
+                        temperature: 29.1
+                        AirPressure: 1009.1
+                        windSpeed: 2.2
+                        rainfall: 0
+                        angle: 91
+                        suhuAir: 28.2
+                        irradiation: 431
+                        bmpTemperature: 28.1
+                        direction: Simulated
+                      - timestamp: "2026-04-02T11:55:00.000Z"
+                        humidity: 71.3
+                        temperature: 29.2
+                        AirPressure: 1009.2
+                        windSpeed: 2.4
+                        rainfall: 0.1
+                        angle: 92
+                        suhuAir: 28.3
+                        irradiation: 432
+                        bmpTemperature: 28.2
+                        direction: Simulated
+                    meta:
+                      mode: simulation
+                      source: petengoran
+                      type: history
+                      limit: 2
+                      offset: 0
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+components:
+  schemas:
+    SensorRecord:
+      type: object
+      additionalProperties: true
+      description: Satu record data sensor topic4.
+      properties:
+        timestamp:
+          type: string
+          description: Timestamp data sensor (format mengikuti data sumber saat ini).
+          examples: ["28-03-26 10:30:00", "2026-03-28T10:30:00Z"]
+        humidity:
+          type: number
+          nullable: true
+        temperature:
+          type: number
+          nullable: true
+        AirPressure:
+          type: number
+          nullable: true
+          description: Perhatikan kapitalisasi field (A dan P besar) untuk kompatibilitas frontend saat ini.
+        windSpeed:
+          type: number
+          nullable: true
+        rainfall:
+          type: number
+          nullable: true
+        angle:
+          type: number
+          nullable: true
+          description: Arah angin dalam derajat.
+        suhuAir:
+          type: number
+          nullable: true
+        irradiation:
+          type: number
+          nullable: true
+        bmpTemperature:
+          type: number
+          nullable: true
+        direction:
+          type: string
+          nullable: true
+          description: Field alternatif yang dipakai di beberapa komponen.
+        pyrano:
+          type: number
+          nullable: true
+          description: Field alternatif irradiance untuk beberapa komponen.
+
+    ResultWrapper:
+      type: object
+      required: [result]
+      description: Format response standar endpoint topic4.
+      properties:
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/SensorRecord'
+
+    SimulationMeta:
+      type: object
+      required: [mode, source, type]
+      properties:
+        mode:
+          type: string
+          enum: [simulation]
+        source:
+          type: string
+          enum: [petengoran, dashboard]
+        type:
+          type: string
+          enum: [latest, history]
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    SimulationResultWrapper:
+      type: object
+      required: [result, meta]
+      properties:
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/SensorRecord'
+        meta:
+          $ref: '#/components/schemas/SimulationMeta'
+
+    ErrorResponse:
+      type: object
+      required: [message]
+      description: Format error standar API.
+      properties:
+        message:
+          type: string
+          example: Internal Server Error
+
+    HealthResponse:
+      type: object
+      required: [message, databases]
+      properties:
+        message:
+          type: string
+          enum: [ok, degraded]
+        databases:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, error, not-configured]
+
+  parameters:
+    PaginationLimit:
+      name: limit
+      in: query
+      required: false
+      description: Jumlah maksimum record history yang dikembalikan.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+      examples:
+        default:
+          value: 100
+    PaginationOffset:
+      name: offset
+      in: query
+      required: false
+      description: Posisi awal data history.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      examples:
+        default:
+          value: 0
+    SimulationSource:
+      name: source
+      in: path
+      required: true
+      description: Sumber data simulasi.
+      schema:
+        type: string
+        enum: [petengoran, dashboard]
+    SimulationLimit:
+      name: limit
+      in: query
+      required: false
+      description: Jumlah data simulasi history (default 20, max 200).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 20
+    SimulationOffset:
+      name: offset
+      in: query
+      required: false
+      description: Posisi awal data simulasi history.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  responses:
+    BadRequestError:
+      description: Parameter query tidak valid (limit/offset)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidLimit:
+              value:
+                message: Query parameter 'limit' harus bilangan bulat positif.
+            invalidOffset:
+              value:
+                message: Query parameter 'offset' harus bilangan bulat nol atau lebih.
+    TooManyRequestsError:
+      description: Request melebihi rate limit
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            throttled:
+              value:
+                message: Terlalu banyak request. Coba lagi sebentar lagi.
+    ServiceUnavailableError:
+      description: Service sementara tidak tersedia (degraded)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            degradedService:
+              value:
+                message: Service sementara tidak tersedia.
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

@@ -1,0 +1,23 @@
+/* Membuat tombol Accordion transparan */
+.custom-accordion .accordion-button {
+  background-color: transparent !important; /* Membuat background transparan */
+  border: none !important; /* Menghapus border */
+  box-shadow: none !important; /* Menghapus shadow */
+  color: #000; /* Warna teks tetap hitam */
+}
+
+/* Warna teks saat accordion dibuka */
+.custom-accordion .accordion-button:not(.collapsed) {
+  color: #007bff; /* Warna teks saat accordion dibuka */
+}
+
+/* Menghapus shadow saat fokus */
+.custom-accordion .accordion-button:focus {
+  box-shadow: none !important;
+}
+
+/* Menyembunyikan tanda panah bawaan */
+.custom-accordion .accordion-button::after {
+  display: none !important; /* Sembunyikan tanda panah bawaan */
+  content: none !important; /* Pastikan tidak ada konten bawaan */
+}

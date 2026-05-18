@@ -11,3 +11,169 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.app-content {
+  width: 100%;
+  margin-left: 250px;
+  transition: margin-left 0.3s ease;
+}
+
+.app-content--collapsed {
+  margin-left: 0;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 250px;
+  height: 100vh;
+  background-color: #f8f9fa;
+  padding: 20px;
+  overflow-x: hidden;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, width 0.3s ease, padding 0.3s ease, box-shadow 0.3s ease;
+  z-index: 1040;
+}
+
+.sidebar--closed {
+  width: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.sidebar-logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.sidebar-logo img {
+  width: 150px;
+  max-width: 100%;
+  height: auto;
+}
+
+.sidebar-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-nav li {
+  margin-bottom: 15px;
+}
+
+.sidebar-link {
+  text-decoration: none;
+  color: #000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 1100;
+  cursor: pointer;
+  border: none;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: left 0.3s ease;
+}
+
+.sidebar-toggle--shifted {
+  left: 260px;
+}
+
+.sidebar-toggle svg {
+  font-size: 24px;
+  color: #007bff;
+}
+
+.navbar-logo {
+  width: 180px;
+  max-width: 60vw;
+  height: auto;
+}
+
+.hero-section {
+  padding-top: 120px;
+}
+
+.hero-row {
+  padding-top: 50px;
+}
+
+.core-features-text {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.gauge-wrapper {
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+.station-map {
+  width: 100%;
+  height: 300px;
+  border: 0;
+}
+
+@media (max-width: 991px) {
+  .app-content {
+    margin-left: 0;
+  }
+
+  .sidebar {
+    width: 250px;
+    transform: translateX(0);
+  }
+
+  .sidebar--closed {
+    width: 250px;
+    padding: 20px;
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .sidebar-toggle--shifted {
+    left: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .hero-section {
+    padding-top: 88px;
+  }
+
+  .hero-row {
+    padding-top: 20px;
+  }
+}
+
+@media (max-width: 576px) {
+  .navbar-logo {
+    width: 140px;
+  }
+
+  .gauge-wrapper {
+    max-width: 160px;
+  }
+
+  .station-map {
+    height: 220px;
+  }
+}

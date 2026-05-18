@@ -267,7 +267,7 @@ const Station1 = () => {
               <iframe
                 title="Location map of Station 1"
                 src="https://www.google.com/maps/embed?pb=!4v1742927582633!6m8!1m7!1semWwMLjxPNBvkFSf0-d_fQ!2m2!1d-5.570831564383814!2d105.240617222604!3f101.32!4f28.680000000000007!5f0.42518105702959824"
-                style={{ width: '100%', height: '300px', border: 0 }}
+                className="station-map"
                 allowFullScreen=""
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"

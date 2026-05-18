@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const IrradiationGauge = ({ irradiation }) => {
@@ -22,7 +21,7 @@ const IrradiationGauge = ({ irradiation }) => {
   const percentValue = irradiation / 800; // Assume max value is 800 W/m²
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="irradiation-gauge"
         nrOfLevels={100}

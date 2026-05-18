@@ -187,9 +187,45 @@
   .user-sidebar {
     width: 100%;
     border-right: none;
+    min-height: auto;
+    position: static;
   }
 
   .user-dashboard__body.is-collapsed .user-sidebar {
+    display: none;
     width: 100%;
+  }
+
+  .user-dashboard__content {
+    padding: calc(var(--ud-navbar-height) + 16px) 20px 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .user-dashboard__content {
+    padding: calc(var(--ud-navbar-height) + 16px) 16px 24px;
+  }
+
+  .user-dashboard__page {
+    padding: 20px;
+  }
+
+  .user-navbar__toggle {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .user-navbar__name {
+    display: none;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-dashboard__content {
+    padding: calc(var(--ud-navbar-height) + 12px) 12px 20px;
+  }
+
+  .user-dashboard__page {
+    padding: 16px;
   }
 }

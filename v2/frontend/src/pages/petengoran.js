@@ -8,39 +8,33 @@ import Station1 from '../components/petengoran/Station1';
 import Station2 from '../components/petengoran/Station2';
 
 const Petengoran = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth >= 992;
+  });
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div className="app-shell">
       {/* Sidebar */}
       <Sidebar isOpen={isSidebarOpen} />
 
       {/* Tombol Toggle Sidebar */}
-      <div
-        style={{
-          position: 'fixed',
-          top: '20px',
-          left: isSidebarOpen ? '260px' : '20px', // Posisi tombol berubah berdasarkan status sidebar
-          zIndex: 1000,
-          cursor: 'pointer',
-          transition: '0.3s',
-        }}
+      <button
+        type="button"
+        className={`sidebar-toggle ${isSidebarOpen ? 'sidebar-toggle--shifted' : ''}`}
         onClick={toggleSidebar}
+        aria-label="Toggle sidebar"
       >
-        <FaBars style={{ fontSize: '24px', color: '#007bff' }} />
-      </div>
+        <FaBars />
+      </button>
 
       {/* Main Content */}
       <div
-        style={{
-          marginLeft: isSidebarOpen ? '250px' : '0', // Konten utama menyesuaikan posisi sidebar
-          width: '100%',
-          transition: '0.3s',
-        }}
+        className={`app-content ${isSidebarOpen ? '' : 'app-content--collapsed'}`}
       >
         <Routes>
           {/* Petengoran Section */}

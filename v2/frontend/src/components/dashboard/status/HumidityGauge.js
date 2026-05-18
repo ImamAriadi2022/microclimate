@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const HumidityGauge = ({ humidity = 0 }) => {
@@ -24,7 +23,7 @@ const HumidityGauge = ({ humidity = 0 }) => {
   const percentValue = typeof humidity === "number" && !isNaN(humidity) ? humidity / 100 : 0;
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="humidity-gauge"
         nrOfLevels={100}

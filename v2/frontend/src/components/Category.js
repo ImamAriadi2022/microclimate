@@ -1,6 +1,5 @@
-import React from 'react';
-import { Container, Row, Col, Card } from 'react-bootstrap';
 import { Slide } from 'react-awesome-reveal';
+import { Card, Col, Container, Row } from 'react-bootstrap';
 
 const categories = [
   { title: 'Temperature', description: 'Monitor real-time temperature data.' },
@@ -17,7 +16,7 @@ const Category = () => {
       <Container>
         <Row className="g-4">
           {categories.map((category, index) => (
-            <Col md={4} key={index}>
+            <Col xs={12} sm={6} md={4} key={index}>
               <Slide direction="up" triggerOnce>
                 <Card className="h-100">
                   <Card.Body>

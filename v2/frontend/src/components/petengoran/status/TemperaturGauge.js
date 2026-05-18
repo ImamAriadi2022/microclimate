@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const TemperatureGauge = ({ temperature }) => {
@@ -26,7 +25,7 @@ const TemperatureGauge = ({ temperature }) => {
   const percentValue = (temperature - 10) / 30; // Assume temperature range is 10°C to 40°C
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="temperature-gauge"
         nrOfLevels={100}

@@ -428,7 +428,7 @@ const EndpointConfigPanel = () => {
 
   const renderConfigList = () => (
     <>
-      <div className="d-flex align-items-center justify-content-between mb-2">
+      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
         <div className="fw-semibold">Daftar Konfigurasi</div>
         <Button size="sm" variant="primary" onClick={handleAddNew}>
           Tambah Konfigurasi
@@ -454,7 +454,7 @@ const EndpointConfigPanel = () => {
                     ? `Base URL: ${item.baseUrl || '-'} ${item.useSingleEndpoint ? '(Single Endpoint & Client Resample)' : ''}`
                     : `Broker: ${item.brokerUrl || '-'} `}
                 </div>
-                <Stack direction="horizontal" gap={2}>
+                <Stack direction="horizontal" gap={2} className="flex-wrap">
                   <Button
                     size="sm"
                     variant="outline-primary"
@@ -642,7 +642,7 @@ const EndpointConfigPanel = () => {
                 </>
               )}
 
-                <Stack direction="horizontal" gap={2}>
+                <Stack direction="horizontal" gap={2} className="flex-wrap">
                   <Button type="submit" variant="primary">
                     {editingId ? 'Simpan Perubahan' : 'Simpan Konfigurasi'}
                   </Button>

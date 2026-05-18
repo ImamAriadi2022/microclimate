@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const RainfallGauge = ({ rainfall }) => {
@@ -24,7 +23,7 @@ const RainfallGauge = ({ rainfall }) => {
   const percentValue = rainfall / 150; // Assume max value is 150 mm
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="rainfall-gauge"
         nrOfLevels={100}

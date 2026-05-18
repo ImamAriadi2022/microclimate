@@ -5,10 +5,9 @@ const Hero = () => {
   return (
     <section
       className="hero-section bg-light py-5"
-      style={{ paddingTop: '120px' }} // Menambahkan padding atas
     >
       <Container>
-        <Row className="align-items-center" style={{ paddingTop: '50px' }}>
+        <Row className="align-items-center hero-row">
           {/* Grid Kiri */}
           <Col md={6}>
             <Slide direction="left" triggerOnce>

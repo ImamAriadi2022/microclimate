@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const AirPressureGauge = ({ airPressure }) => {
@@ -22,7 +21,7 @@ const AirPressureGauge = ({ airPressure }) => {
   const percentValue = (airPressure - 950) / 120;
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="air-pressure-gauge"
         nrOfLevels={100}

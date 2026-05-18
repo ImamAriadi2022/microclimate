@@ -1,7 +1,6 @@
-import React from 'react';
-import { Container, Row, Col, Card } from 'react-bootstrap';
-import { FaDesktop, FaDatabase, FaBell, FaCogs, FaFileExport, FaChartLine } from 'react-icons/fa';
 import { Slide } from 'react-awesome-reveal';
+import { Card, Col, Container, Row } from 'react-bootstrap';
+import { FaBell, FaChartLine, FaCogs, FaDatabase, FaDesktop, FaFileExport } from 'react-icons/fa';
 
 const features = [
   {
@@ -42,7 +41,7 @@ const CardFitur = () => {
       <Container>
         <Row className="g-4">
           {features.map((feature, index) => (
-            <Col md={4} key={index}>
+            <Col xs={12} sm={6} md={4} key={index}>
               <Slide direction="up" triggerOnce>
                 <Card className="h-100 text-center">
                   <Card.Body>

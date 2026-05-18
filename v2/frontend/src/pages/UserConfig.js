@@ -10,7 +10,10 @@ import '../features/user-dashboard/userDashboard.css';
 
 const UserConfig = () => {
   const { username } = useParams();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth >= 992;
+  });
   const displayName =
     localStorage.getItem('mc_v2_display_name') ||
     username ||

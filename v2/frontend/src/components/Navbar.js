@@ -25,9 +25,7 @@ const CustomNavbar = () => {
           <img
             src="./img/logo.png" // Ganti dengan path logo Anda
             alt="Logo"
-            width="200"
-            height="40"
-            className="d-inline-block align-top"
+            className="d-inline-block align-top navbar-logo"
           />{' '}
         </Navbar.Brand>
 

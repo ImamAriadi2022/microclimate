@@ -1,6 +1,5 @@
-import React from 'react';
-import { Container } from 'react-bootstrap';
 import { Slide } from 'react-awesome-reveal';
+import { Container } from 'react-bootstrap';
 
 const CoreFitur = () => {
   return (
@@ -24,7 +23,7 @@ const CoreFitur = () => {
         <Slide direction="up" triggerOnce>
           {/* Konten utama */}
           <h3 className="fw-bold mt-4">Core Features of Solid</h3>
-          <p className="mt-3" style={{ padding: '0 300px' }}>
+          <p className="mt-3 core-features-text">
             Microclimate Dashboard Monitoring System is a web-based platform designed to monitor and analyze microclimate data in real time. This system is equipped with key features such as
           </p>
         </Slide>

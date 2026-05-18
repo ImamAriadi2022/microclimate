@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const WindDirectionGauge = ({ windDirection }) => {
@@ -25,7 +24,7 @@ const WindDirectionGauge = ({ windDirection }) => {
   const percentValue = typeof windDirection === "number" ? windDirection / 360 : 0;
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="wind-direction-gauge"
         nrOfLevels={360}

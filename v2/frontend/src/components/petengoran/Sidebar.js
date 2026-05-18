@@ -4,24 +4,14 @@ import { Link } from 'react-router-dom';
 const Sidebar = ({ isOpen }) => {
   return (
     <div
-      style={{
-        width: isOpen ? '250px' : '0', // Lebar sidebar berubah berdasarkan isOpen
-        height: '100vh',
-        backgroundColor: '#f8f9fa',
-        padding: isOpen ? '20px' : '0', // Padding dihapus saat sidebar ditutup
-        position: 'fixed',
-        boxShadow: isOpen ? '2px 0 5px rgba(0, 0, 0, 0.1)' : 'none',
-        overflowX: 'hidden', // Menyembunyikan konten saat sidebar ditutup
-        transition: '0.3s', // Animasi transisi
-      }}
+      className={`sidebar ${isOpen ? '' : 'sidebar--closed'}`}
     >
       {/* Logo */}
       {isOpen && (
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div className="sidebar-logo">
           <img
             src="/img/logo.png" // Ganti dengan path logo Anda
             alt="Logo"
-            style={{ width: '150px', marginBottom: '10px' }}
           />
           <hr />
         </div>
@@ -30,74 +20,49 @@ const Sidebar = ({ isOpen }) => {
       {/* Menu Items */}
       {isOpen && (
         <nav>
-          <ul style={{ listStyleType: 'none', padding: 0 }}>
-            <li style={{ marginBottom: '15px' }}>
+          <ul className="sidebar-nav">
+            <li>
               <Link
                 to="/"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                className="sidebar-link"
               >
-                <FaHome style={{ marginRight: '10px' }} />
+                <FaHome />
                 Go Home
               </Link>
             </li>
-            <li style={{ marginBottom: '15px' }}>
+            <li>
               <Link
                 to="/petengoran"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                className="sidebar-link"
               >
-                <FaTachometerAlt style={{ marginRight: '10px' }} />
+                <FaTachometerAlt />
                 Dashboard
               </Link>
             </li>
-            <li style={{ marginBottom: '15px' }}>
+            <li>
               <Link
                 to="station1"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                className="sidebar-link"
               >
-                <FaMapMarkerAlt style={{ marginRight: '10px' }} />
+                <FaMapMarkerAlt />
                 Station 1
               </Link>
             </li>
-            <li style={{ marginBottom: '15px' }}>
+            <li>
               <Link
                 to="station2"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                className="sidebar-link"
               >
-                <FaMapMarkerAlt style={{ marginRight: '10px' }} />
+                <FaMapMarkerAlt />
                 Station 2
               </Link>
             </li>
             <li>
               <Link
                 to="download"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                className="sidebar-link"
               >
-                <FaDownload style={{ marginRight: '10px' }} />
+                <FaDownload />
                 Download Data
               </Link>
             </li>

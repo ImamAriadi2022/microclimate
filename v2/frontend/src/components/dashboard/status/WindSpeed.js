@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const WindspeedGauge = ({ windspeed }) => {
@@ -29,7 +28,7 @@ const WindspeedGauge = ({ windspeed }) => {
   const percentValue = windspeed / 120; // Assume max value is 120 km/h
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="windspeed-gauge"
         nrOfLevels={100}

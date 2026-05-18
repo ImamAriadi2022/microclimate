@@ -1,4 +1,3 @@
-import React from "react";
 import GaugeChart from "react-gauge-chart";
 
 const OxygenGauge = ({ oxygen }) => {
@@ -22,7 +21,7 @@ const OxygenGauge = ({ oxygen }) => {
   const percentValue = (oxygen - 18) / 7; // Assume oxygen range is 18% to 25%
 
   return (
-    <div style={{ width: "200px", margin: "0 auto" }}>
+    <div className="gauge-wrapper">
       <GaugeChart
         id="oxygen-gauge"
         nrOfLevels={100}

@@ -1,26 +1,26 @@
 export const stationTemplates = [
   {
     id: 'station2',
-    name: 'Station2',
-    description: 'Template dashboard Station2 dari v1 sebagai acuan utama.',
+    name: 'data alat',
+    description: 'Template dashboard',
     basePath: '/custom/station2',
     requiredEndpoints: [
       {
         key: 'topic5History',
         label: 'Topic5 History',
-        description: 'Data sensor Station2 (topic5).',
+        description: 'Data sensor (topic5).',
         defaultPath: '/petengoran/topic5/history',
       },
       {
-        key: 'station2Daily',
-        label: 'Station2 Daily History',
-        description: 'Riwayat harian Station2.',
+        key: 'Daily data',
+        label: 'Daily History',
+        description: 'Riwayat harian.',
         defaultPath: '/petengoran/station2/history',
       },
       {
-        key: 'station2Resample15m',
-        label: 'Station2 Resample 15m',
-        description: 'Data resample 15 menit Station2.',
+        key: 'Resample15m',
+        label: 'Resample 15m',
+        description: 'Data resample 15 menit',
         defaultPath: '/petengoran/station2/history',
       },
     ],
@@ -28,7 +28,7 @@ export const stationTemplates = [
       {
         key: 'topic5',
         label: 'MQTT Topic 5',
-        description: 'Topik data Station2.',
+        description: 'Topik data',
         defaultTopic: 'topic5',
       },
     ],

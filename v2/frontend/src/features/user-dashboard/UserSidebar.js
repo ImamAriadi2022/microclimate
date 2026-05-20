@@ -20,7 +20,7 @@ const UserSidebar = ({ basePath, isOpen }) => {
       icon: FiLink2,
     },
     {
-      label: 'Template Station2',
+      label: 'Editor',
       to: `${basePath}/templates`,
       icon: FiGrid,
     },

@@ -271,7 +271,7 @@ const DashboardLinksPanel = () => {
     <Card className="shadow-sm">
       <Card.Body>
         <Card.Title>Dashboard Link</Card.Title>
-        <Card.Text>Buat link dashboard custom berbasis template Station2.</Card.Text>
+        <Card.Text>Buat link dashboard custom berbasis template Microclimate</Card.Text>
         <Alert variant={status.type || 'info'}>
           {status.message || 'Panel simulasi: data disimpan lokal.'}
         </Alert>

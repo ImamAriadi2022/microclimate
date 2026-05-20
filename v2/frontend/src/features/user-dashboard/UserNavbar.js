@@ -29,7 +29,7 @@ const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
           >
             <FiMenu size={18} />
           </button>
-          <Navbar.Brand className="user-navbar__brand">Dashboard User</Navbar.Brand>
+          <Navbar.Brand className="user-navbar__brand">Microclimate</Navbar.Brand>
         </div>
         <Dropdown align="end">
           <Dropdown.Toggle

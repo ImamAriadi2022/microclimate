@@ -169,7 +169,7 @@ const TemplatePage = () => {
   return (
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
-        <h2>Template Station</h2>
+        <h2>Template microclimate</h2>
         <p>Kelola dashboard custom: pilih link, edit tampilan, dan lihat preview.</p>
       </div>
       <Row className="g-4">

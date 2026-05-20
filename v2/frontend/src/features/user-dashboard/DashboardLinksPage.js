@@ -5,7 +5,7 @@ const DashboardLinksPage = () => {
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
         <h2>Dashboard Link</h2>
-        <p>Buat dan kelola link dashboard custom berbasis template Station2.</p>
+        <p>Buat dan kelola link dashboard custom berbasis microclimate.</p>
       </div>
       <DashboardLinksPanel />
     </section>

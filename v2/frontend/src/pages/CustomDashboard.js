@@ -5,6 +5,37 @@ import CustomStation2 from '../components/custom/CustomStation2';
 import { getTemplateById } from '../features/station-template/stationTemplates';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';
+const UI_KEY = 'mc_v2_dashboard_link_ui';
+const DEFAULT_UI = {
+  gauges: true,
+  gaugeItems: {
+    humidity: true,
+    temperature: true,
+    rainfall: true,
+    windspeed: true,
+    irradiation: true,
+    windDirection: true,
+    airPressure: true,
+    bmpTemperature: true,
+  },
+  tableColumns: {
+    status: true,
+    timestamp: true,
+    humidity: true,
+    temperature: true,
+    rainfall: true,
+    windspeed: true,
+    irradiation: true,
+    windDirection: true,
+    airPressure: true,
+    bmpTemperature: true,
+  },
+  chart: true,
+  map: true,
+  table: true,
+  filterButtons: true,
+  downloadButton: true,
+};
 
 const CustomDashboard = () => {
   const navigate = useNavigate();
@@ -12,11 +43,13 @@ const CustomDashboard = () => {
   const templateInfo = useMemo(() => getTemplateById(template), [template]);
   const [linkData, setLinkData] = useState(null);
   const [configData, setConfigData] = useState(null);
+  const [uiSettings, setUiSettings] = useState(DEFAULT_UI);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const savedLinks = localStorage.getItem(STORAGE_KEY);
     const savedConfigs = localStorage.getItem('mc_v2_user_configs');
+    const savedUi = localStorage.getItem(UI_KEY);
     if (!savedLinks) {
       setIsLoading(false);
       return;
@@ -28,6 +61,29 @@ const CustomDashboard = () => {
       );
       setLinkData(foundLink || null);
 
+      if (savedUi) {
+        try {
+          const parsedUi = JSON.parse(savedUi);
+          const linkUi = foundLink ? parsedUi[foundLink.id] : null;
+          setUiSettings({
+            ...DEFAULT_UI,
+            ...(linkUi || {}),
+            gaugeItems: {
+              ...DEFAULT_UI.gaugeItems,
+              ...((linkUi && linkUi.gaugeItems) || {}),
+            },
+            tableColumns: {
+              ...DEFAULT_UI.tableColumns,
+              ...((linkUi && linkUi.tableColumns) || {}),
+            },
+          });
+        } catch (_error) {
+          setUiSettings(DEFAULT_UI);
+        }
+      } else {
+        setUiSettings(DEFAULT_UI);
+      }
+
       if (foundLink && foundLink.configId && savedConfigs) {
         const parsedConfigs = JSON.parse(savedConfigs);
         const foundConfig = parsedConfigs.find((c) => c.id === foundLink.configId);
@@ -38,6 +94,7 @@ const CustomDashboard = () => {
     } catch (_error) {
       setLinkData(null);
       setConfigData(null);
+      setUiSettings(DEFAULT_UI);
     }
     setIsLoading(false);
   }, [slug, template]);
@@ -52,7 +109,11 @@ const CustomDashboard = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <div style={{ flex: 1 }}>
-          <CustomStation2 customConfig={configData} customTitle={linkData?.name} />
+          <CustomStation2
+            customConfig={configData}
+            customTitle={linkData?.name}
+            uiSettings={uiSettings}
+          />
         </div>
         <footer 
           style={{ 

@@ -4,6 +4,7 @@ import {
     PETENGORAN_DAILY_STATION2_URL,
     PETENGORAN_RESAMPLE15M_STATION2_URL,
 } from '../../config/apiEndpoints';
+import DataDownloadModal from '../DataDownloadModal';
 import TrendChart, { resampleTimeSeriesWithMeanFill } from "../petengoran/chart";
 import AirPressureGauge from '../petengoran/status/AirPressure';
 import HumidityGauge from '../petengoran/status/HumidityGauge';
@@ -12,7 +13,6 @@ import RainfallGauge from '../petengoran/status/Rainfall';
 import TemperatureGauge from '../petengoran/status/TemperaturGauge';
 import WindDirectionGauge from '../petengoran/status/WindDirection';
 import WindSpeedGauge from '../petengoran/status/WindSpeed';
-import DataDownloadModal from '../DataDownloadModal';
 
 // Helper
 const windDirectionToEnglish = (dir) => {
@@ -232,7 +232,50 @@ const generateMockData = (count, startDateTime, endDateTime) => {
   return data.reverse();
 };
 
-const Station2 = ({ customConfig, customTitle }) => {
+const DEFAULT_UI = {
+  gauges: true,
+  gaugeItems: {
+    humidity: true,
+    temperature: true,
+    rainfall: true,
+    windspeed: true,
+    irradiation: true,
+    windDirection: true,
+    airPressure: true,
+    bmpTemperature: true,
+  },
+  tableColumns: {
+    status: true,
+    timestamp: true,
+    humidity: true,
+    temperature: true,
+    rainfall: true,
+    windspeed: true,
+    irradiation: true,
+    windDirection: true,
+    airPressure: true,
+    bmpTemperature: true,
+  },
+  chart: true,
+  map: true,
+  table: true,
+  filterButtons: true,
+  downloadButton: true,
+};
+
+const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
+  const activeUi = {
+    ...DEFAULT_UI,
+    ...uiSettings,
+    gaugeItems: {
+      ...DEFAULT_UI.gaugeItems,
+      ...(uiSettings.gaugeItems || {}),
+    },
+    tableColumns: {
+      ...DEFAULT_UI.tableColumns,
+      ...(uiSettings.tableColumns || {}),
+    },
+  };
   const [filter, setFilter] = useState('1d');
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -539,21 +582,25 @@ const Station2 = ({ customConfig, customTitle }) => {
               </span>
             </div>
             <div className="mt-2 d-inline-flex gap-2">
-              <button
-                type="button"
-                className={`btn btn-sm ${gaugeMode === 'realtime' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => setGaugeMode('realtime')}
-              >
-                Mode Realtime
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${gaugeMode === 'last-active' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => setGaugeMode('last-active')}
-                disabled={!lastActiveGaugeData}
-              >
-                Mode Terakhir Aktif
-              </button>
+              {activeUi.gauges && (
+                <>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${gaugeMode === 'realtime' ? 'btn-primary' : 'btn-outline-primary'}`}
+                    onClick={() => setGaugeMode('realtime')}
+                  >
+                    Mode Realtime
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${gaugeMode === 'last-active' ? 'btn-primary' : 'btn-outline-primary'}`}
+                    onClick={() => setGaugeMode('last-active')}
+                    disabled={!lastActiveGaugeData}
+                  >
+                    Mode Terakhir Aktif
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className={`btn btn-sm ${dataSourceMode === 'simulation' ? 'btn-warning' : 'btn-outline-warning'}`}
@@ -561,230 +608,264 @@ const Station2 = ({ customConfig, customTitle }) => {
               >
                 Simulasi {dataSourceMode === 'simulation' ? 'ON' : 'OFF'}
               </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-success"
-                onClick={() => setShowDownloadModal(true)}
-              >
-                Download Data
-              </button>
-            </div>
-          </Col>
-        </Row>
-        <Row className="g-4">
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <HumidityGauge humidity={typeof gaugeData.humidity === 'number' ? gaugeData.humidity : 0} />
-              <h5>Humidity</h5>
-              <p>{typeof gaugeData.humidity === 'number' ? `${gaugeData.humidity}%` : gaugeData.humidity}</p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <TemperatureGauge temperature={typeof gaugeData.temperature === 'number' ? gaugeData.temperature : 0} />
-              <h5>Temperature</h5>
-              <p>{typeof gaugeData.temperature === 'number' ? `${gaugeData.temperature}°C` : gaugeData.temperature}</p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <RainfallGauge rainfall={typeof gaugeData.rainfall === 'number' ? gaugeData.rainfall : 0} />
-              <h5>Rainfall</h5>
-              <p>{typeof gaugeData.rainfall === 'number' ? `${gaugeData.rainfall} mm` : gaugeData.rainfall}</p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <WindSpeedGauge windspeed={typeof gaugeData.windspeed === 'number' ? gaugeData.windspeed : 0} />
-              <h5>Wind Speed</h5>
-              <p>{typeof gaugeData.windspeed === 'number' ? `${gaugeData.windspeed} km/h` : gaugeData.windspeed}</p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <IrradiationGauge irradiation={typeof gaugeData.irradiation === 'number' ? gaugeData.irradiation : 0} />
-              <h5>Irradiation</h5>
-              <p>{typeof gaugeData.irradiation === 'number' ? `${gaugeData.irradiation} W/m²` : gaugeData.irradiation}</p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)'}}>
-              <WindDirectionGauge windDirection={gaugeData.angle} />
-              <h5>Wind Direction</h5>
-              <p>
-                {gaugeData.windDirection 
-                  ? `${gaugeData.windDirection} (${gaugeData.angle}°)`
-                  : gaugeData.angle}
-              </p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <AirPressureGauge airPressure={typeof gaugeData.airpressure === 'number' ? gaugeData.airpressure : 0} />
-              <h5>Air Pressure</h5>
-              <p>{typeof gaugeData.airpressure === 'number' ? `${gaugeData.airpressure} hPa` : gaugeData.airpressure}</p>
-            </div>
-          </Col>
-          <Col md={3} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <TemperatureGauge temperature={typeof gaugeData.bmptemperature === 'number' ? gaugeData.bmptemperature : 0} />
-              <h5>BMP Temperature</h5>
-              <p>{typeof gaugeData.bmptemperature === 'number' ? `${gaugeData.bmptemperature}°C` : gaugeData.bmptemperature}</p>
-            </div>
-          </Col>
-        </Row>
-        <Row className="mt-5 mb-3">
-          <Col className="text-center">
-            <div className="d-flex flex-column align-items-center gap-2 mb-3">
-              <Form.Label className="mb-0 fw-semibold">Pilih Rentang Waktu (opsional)</Form.Label>
-              <div className="d-flex gap-2 flex-wrap justify-content-center">
-                <Form.Control
-                  type="datetime-local"
-                  style={{ maxWidth: '280px' }}
-                  value={startDateTime}
-                  onChange={(e) => setStartDateTime(e.target.value)}
-                  placeholder="Mulai"
-                />
-                <Form.Control
-                  type="datetime-local"
-                  style={{ maxWidth: '280px' }}
-                  value={endDateTime}
-                  onChange={(e) => setEndDateTime(e.target.value)}
-                  placeholder="Selesai"
-                />
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => {
-                    setStartDateTime('');
-                    setEndDateTime('');
-                  }}
-                  disabled={!startDateTime && !endDateTime}
+              {activeUi.downloadButton && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-success"
+                  onClick={() => setShowDownloadModal(true)}
                 >
-                  Reset Rentang
-                </Button>
-              </div>
-            </div>
-            <ButtonGroup>
-              <Button
-                variant={filter === '1d' ? 'primary' : 'outline-primary'}
-                onClick={() => setFilter('1d')}
-              >
-                1 Hari Terakhir
-              </Button>
-              <Button
-                variant={filter === '7d' ? 'primary' : 'outline-primary'}
-                onClick={() => setFilter('7d')}
-              >
-                7 Hari Terakhir
-              </Button>
-              <Button
-                variant={filter === '1m' ? 'primary' : 'outline-primary'}
-                onClick={() => setFilter('1m')}
-              >
-                1 Bulan Terakhir
-              </Button>
-            </ButtonGroup>
-          </Col>
-        </Row>
-        <Row>
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Chart Status</h2>
-          </Col>
-        </Row>
-        <Row>
-          <Col>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-                <TrendChart
-                  data={filteredData}
-                  fields={[
-                    { key: 'humidity', label: 'Humidity (%)' },
-                    { key: 'temperature', label: 'Temperature (°C)' },
-                    { key: 'rainfall', label: 'Rainfall (mm)' },
-                    { key: 'windspeed', label: 'Wind Speed (km/h)' },
-                    { key: 'irradiation', label: 'Irradiation (W/m²)' },
-                    { key: 'angle', label: 'Wind Direction (°)' },
-                    { key: 'airpressure', label: 'Air Pressure (hPa)' },
-                    { key: 'bmptemperature', label: 'BMP Temperature (°C)' },
-                  ]}
-                />
-            </div>
-          </Col>
-        </Row>
-
-        <Row>
-          <Col>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)', overflowX: 'auto' }}>
-              {tableData.length > 0 ? (
-                <Table striped bordered hover variant="light" style={{ marginBottom: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Timestamp</th>
-                      <th>Humidity (%)</th>
-                      <th>Temperature (°C)</th>
-                      <th>Rainfall (mm)</th>
-                      <th>Wind Speed (km/h)</th>
-                      <th>Irradiation (W/m²)</th>
-                      <th>Wind Direction</th>
-                      <th>Air Pressure (hPa)</th>
-                      <th>BMP Temperature (°C)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.slice(0, 10).map((item, index) => {
-                      const isLatest = index === 0;
-                      const isUsedInGauge = (
-                        item.humidity === gaugeData.humidity &&
-                        item.temperature === gaugeData.temperature &&
-                        item.rainfall === gaugeData.rainfall &&
-                        item.windspeed === gaugeData.windspeed &&
-                        item.irradiation === gaugeData.irradiation &&
-                        item.angle === gaugeData.angle &&
-                        item.airpressure === gaugeData.airpressure &&
-                        item.bmptemperature === gaugeData.bmptemperature
-                      );
-                      return (
-                        <tr key={index}>
-                          <td>
-                            <div className="d-flex flex-column gap-1">
-                              {isLatest && <span className="badge bg-primary">Latest</span>}
-                              {isUsedInGauge && <span className="badge bg-success">Used in Gauge</span>}
-                            </div>
-                          </td>
-                          <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
-                          <td>{item.humidity}</td>
-                          <td>{item.temperature}</td>
-                          <td>{item.rainfall}</td>
-                          <td>{item.windspeed}</td>
-                          <td>{item.irradiation}</td>
-                          <td>{item.windDirection}</td>
-                          <td>{item.airpressure}</td>
-                          <td>{item.bmptemperature}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              ) : (
-                <p className="text-center" style={{ color: '#007bff' }}>
-                  {loading ? 'Loading data...' : 'No data available for the selected filter'}
-                </p>
+                  Download Data
+                </button>
               )}
             </div>
           </Col>
         </Row>
+        {activeUi.gauges && (
+          <Row className="g-4">
+            {activeUi.gaugeItems.humidity && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <HumidityGauge humidity={typeof gaugeData.humidity === 'number' ? gaugeData.humidity : 0} />
+                  <h5>Humidity</h5>
+                  <p>{typeof gaugeData.humidity === 'number' ? `${gaugeData.humidity}%` : gaugeData.humidity}</p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.temperature && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <TemperatureGauge temperature={typeof gaugeData.temperature === 'number' ? gaugeData.temperature : 0} />
+                  <h5>Temperature</h5>
+                  <p>{typeof gaugeData.temperature === 'number' ? `${gaugeData.temperature}°C` : gaugeData.temperature}</p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.rainfall && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <RainfallGauge rainfall={typeof gaugeData.rainfall === 'number' ? gaugeData.rainfall : 0} />
+                  <h5>Rainfall</h5>
+                  <p>{typeof gaugeData.rainfall === 'number' ? `${gaugeData.rainfall} mm` : gaugeData.rainfall}</p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.windspeed && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <WindSpeedGauge windspeed={typeof gaugeData.windspeed === 'number' ? gaugeData.windspeed : 0} />
+                  <h5>Wind Speed</h5>
+                  <p>{typeof gaugeData.windspeed === 'number' ? `${gaugeData.windspeed} km/h` : gaugeData.windspeed}</p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.irradiation && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <IrradiationGauge irradiation={typeof gaugeData.irradiation === 'number' ? gaugeData.irradiation : 0} />
+                  <h5>Irradiation</h5>
+                  <p>{typeof gaugeData.irradiation === 'number' ? `${gaugeData.irradiation} W/m²` : gaugeData.irradiation}</p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.windDirection && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)'}}>
+                  <WindDirectionGauge windDirection={gaugeData.angle} />
+                  <h5>Wind Direction</h5>
+                  <p>
+                    {gaugeData.windDirection 
+                      ? `${gaugeData.windDirection} (${gaugeData.angle}°)`
+                      : gaugeData.angle}
+                  </p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.airPressure && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <AirPressureGauge airPressure={typeof gaugeData.airpressure === 'number' ? gaugeData.airpressure : 0} />
+                  <h5>Air Pressure</h5>
+                  <p>{typeof gaugeData.airpressure === 'number' ? `${gaugeData.airpressure} hPa` : gaugeData.airpressure}</p>
+                </div>
+              </Col>
+            )}
+            {activeUi.gaugeItems.bmpTemperature && (
+              <Col md={3} className="text-center">
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                  <TemperatureGauge temperature={typeof gaugeData.bmptemperature === 'number' ? gaugeData.bmptemperature : 0} />
+                  <h5>BMP Temperature</h5>
+                  <p>{typeof gaugeData.bmptemperature === 'number' ? `${gaugeData.bmptemperature}°C` : gaugeData.bmptemperature}</p>
+                </div>
+              </Col>
+            )}
+          </Row>
+        )}
+        {activeUi.filterButtons && (
+          <Row className="mt-5 mb-3">
+            <Col className="text-center">
+              <div className="d-flex flex-column align-items-center gap-2 mb-3">
+                <Form.Label className="mb-0 fw-semibold">Pilih Rentang Waktu (opsional)</Form.Label>
+                <div className="d-flex gap-2 flex-wrap justify-content-center">
+                  <Form.Control
+                    type="datetime-local"
+                    style={{ maxWidth: '280px' }}
+                    value={startDateTime}
+                    onChange={(e) => setStartDateTime(e.target.value)}
+                    placeholder="Mulai"
+                  />
+                  <Form.Control
+                    type="datetime-local"
+                    style={{ maxWidth: '280px' }}
+                    value={endDateTime}
+                    onChange={(e) => setEndDateTime(e.target.value)}
+                    placeholder="Selesai"
+                  />
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => {
+                      setStartDateTime('');
+                      setEndDateTime('');
+                    }}
+                    disabled={!startDateTime && !endDateTime}
+                  >
+                    Reset Rentang
+                  </Button>
+                </div>
+              </div>
+              <ButtonGroup>
+                <Button
+                  variant={filter === '1d' ? 'primary' : 'outline-primary'}
+                  onClick={() => setFilter('1d')}
+                >
+                  1 Hari Terakhir
+                </Button>
+                <Button
+                  variant={filter === '7d' ? 'primary' : 'outline-primary'}
+                  onClick={() => setFilter('7d')}
+                >
+                  7 Hari Terakhir
+                </Button>
+                <Button
+                  variant={filter === '1m' ? 'primary' : 'outline-primary'}
+                  onClick={() => setFilter('1m')}
+                >
+                  1 Bulan Terakhir
+                </Button>
+              </ButtonGroup>
+            </Col>
+          </Row>
+        )}
+        {activeUi.chart && (
+          <>
+            <Row>
+              <Col>
+                <h2 className="text-center" style={{ color: '#007bff' }}>Chart Status</h2>
+              </Col>
+            </Row>
+            <Row>
+              <Col>
+                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+                    <TrendChart
+                      data={filteredData}
+                      fields={[
+                        { key: 'humidity', label: 'Humidity (%)' },
+                        { key: 'temperature', label: 'Temperature (°C)' },
+                        { key: 'rainfall', label: 'Rainfall (mm)' },
+                        { key: 'windspeed', label: 'Wind Speed (km/h)' },
+                        { key: 'irradiation', label: 'Irradiation (W/m²)' },
+                        { key: 'angle', label: 'Wind Direction (°)' },
+                        { key: 'airpressure', label: 'Air Pressure (hPa)' },
+                        { key: 'bmptemperature', label: 'BMP Temperature (°C)' },
+                      ]}
+                    />
+                </div>
+              </Col>
+            </Row>
+          </>
+        )}
+
+        {activeUi.table && (
+          <Row>
+            <Col>
+              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)', overflowX: 'auto' }}>
+                {tableData.length > 0 ? (
+                  <Table striped bordered hover variant="light" style={{ marginBottom: 0 }}>
+                    <thead>
+                      <tr>
+                        {activeUi.tableColumns.status && <th>Status</th>}
+                        {activeUi.tableColumns.timestamp && <th>Timestamp</th>}
+                        {activeUi.tableColumns.humidity && <th>Humidity (%)</th>}
+                        {activeUi.tableColumns.temperature && <th>Temperature (°C)</th>}
+                        {activeUi.tableColumns.rainfall && <th>Rainfall (mm)</th>}
+                        {activeUi.tableColumns.windspeed && <th>Wind Speed (km/h)</th>}
+                        {activeUi.tableColumns.irradiation && <th>Irradiation (W/m²)</th>}
+                        {activeUi.tableColumns.windDirection && <th>Wind Direction</th>}
+                        {activeUi.tableColumns.airPressure && <th>Air Pressure (hPa)</th>}
+                        {activeUi.tableColumns.bmpTemperature && <th>BMP Temperature (°C)</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableData.slice(0, 10).map((item, index) => {
+                        const isLatest = index === 0;
+                        const isUsedInGauge = (
+                          item.humidity === gaugeData.humidity &&
+                          item.temperature === gaugeData.temperature &&
+                          item.rainfall === gaugeData.rainfall &&
+                          item.windspeed === gaugeData.windspeed &&
+                          item.irradiation === gaugeData.irradiation &&
+                          item.angle === gaugeData.angle &&
+                          item.airpressure === gaugeData.airpressure &&
+                          item.bmptemperature === gaugeData.bmptemperature
+                        );
+                        return (
+                          <tr key={index}>
+                            {activeUi.tableColumns.status && (
+                              <td>
+                                <div className="d-flex flex-column gap-1">
+                                  {isLatest && <span className="badge bg-primary">Latest</span>}
+                                  {isUsedInGauge && <span className="badge bg-success">Used in Gauge</span>}
+                                </div>
+                              </td>
+                            )}
+                            {activeUi.tableColumns.timestamp && (
+                              <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
+                            )}
+                            {activeUi.tableColumns.humidity && <td>{item.humidity}</td>}
+                            {activeUi.tableColumns.temperature && <td>{item.temperature}</td>}
+                            {activeUi.tableColumns.rainfall && <td>{item.rainfall}</td>}
+                            {activeUi.tableColumns.windspeed && <td>{item.windspeed}</td>}
+                            {activeUi.tableColumns.irradiation && <td>{item.irradiation}</td>}
+                            {activeUi.tableColumns.windDirection && <td>{item.windDirection}</td>}
+                            {activeUi.tableColumns.airPressure && <td>{item.airpressure}</td>}
+                            {activeUi.tableColumns.bmpTemperature && <td>{item.bmptemperature}</td>}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                ) : (
+                  <p className="text-center" style={{ color: '#007bff' }}>
+                    {loading ? 'Loading data...' : 'No data available for the selected filter'}
+                  </p>
+                )}
+              </div>
+            </Col>
+          </Row>
+        )}
 
       </Container>
-      <DataDownloadModal
-        show={showDownloadModal}
-        onHide={() => setShowDownloadModal(false)}
-        data={filteredData}
-        stationName={customTitle || 'Station 2'}
-        availableFields={[
-          'humidity', 'temperature', 'rainfall', 'windspeed',
-          'irradiation', 'windDirection', 'angle', 'bmptemperature', 'airpressure'
-        ]}
-      />
+      {activeUi.downloadButton && (
+        <DataDownloadModal
+          show={showDownloadModal}
+          onHide={() => setShowDownloadModal(false)}
+          data={filteredData}
+          stationName={customTitle || 'Station 2'}
+          availableFields={[
+            'humidity', 'temperature', 'rainfall', 'windspeed',
+            'irradiation', 'windDirection', 'angle', 'bmptemperature', 'airpressure'
+          ]}
+        />
+      )}
     </section>
   );
 };

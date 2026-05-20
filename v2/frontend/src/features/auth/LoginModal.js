@@ -46,6 +46,9 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
     localStorage.setItem('mc_v2_login_email', email.trim());
     localStorage.setItem('mc_v2_username', username);
     localStorage.setItem('mc_v2_display_name', displayName);
+    if (mode === 'register') {
+      localStorage.setItem('mc_v2_password', password);
+    }
     setStatus({
       type: 'success',
       message:

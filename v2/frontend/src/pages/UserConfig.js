@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Container } from 'react-bootstrap';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import ChangeEmailPage from '../features/user-dashboard/ChangeEmailPage';
+import ChangePasswordPage from '../features/user-dashboard/ChangePasswordPage';
 import DashboardLinksPage from '../features/user-dashboard/DashboardLinksPage';
 import EndpointConfigPage from '../features/user-dashboard/EndpointConfigPage';
+import OverviewPage from '../features/user-dashboard/OverviewPage';
+import ProfilePage from '../features/user-dashboard/ProfilePage';
 import TemplatePage from '../features/user-dashboard/TemplatePage';
 import UserNavbar from '../features/user-dashboard/UserNavbar';
 import UserSidebar from '../features/user-dashboard/UserSidebar';
@@ -14,11 +18,12 @@ const UserConfig = () => {
     if (typeof window === 'undefined') return true;
     return window.innerWidth >= 992;
   });
-  const displayName =
+  const [displayName, setDisplayName] = useState(
     localStorage.getItem('mc_v2_display_name') ||
-    username ||
-    localStorage.getItem('mc_v2_username') ||
-    'user';
+      username ||
+      localStorage.getItem('mc_v2_username') ||
+      'user'
+  );
   const basePath = `/${username || 'user'}/dashboard`;
 
   const handleToggleSidebar = () => {
@@ -37,10 +42,14 @@ const UserConfig = () => {
         <main className="user-dashboard__content">
           <Container fluid>
             <Routes>
-              <Route index element={<Navigate to="endpoint" replace />} />
+              <Route index element={<OverviewPage basePath={basePath} displayName={displayName} />} />
               <Route path="endpoint" element={<EndpointConfigPage />} />
               <Route path="links" element={<DashboardLinksPage />} />
               <Route path="templates" element={<TemplatePage />} />
+              <Route path="profile" element={<ProfilePage onProfileChange={setDisplayName} />} />
+              <Route path="email" element={<ChangeEmailPage />} />
+              <Route path="password" element={<ChangePasswordPage />} />
+              <Route path="*" element={<Navigate to="." replace />} />
             </Routes>
           </Container>
         </main>

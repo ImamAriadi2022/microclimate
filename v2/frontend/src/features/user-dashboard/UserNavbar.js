@@ -7,6 +7,8 @@ const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
   const navigate = useNavigate();
   const safeName = username || 'user';
   const initials = useMemo(() => safeName.charAt(0).toUpperCase(), [safeName]);
+  const accountUsername = localStorage.getItem('mc_v2_username') || safeName;
+  const profilePhoto = localStorage.getItem('mc_v2_profile_photo') || '';
 
   const handleLogout = () => {
     localStorage.removeItem('mc_v2_login_email');
@@ -36,14 +38,22 @@ const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
             type="button"
             className="user-navbar__toggle"
           >
-            <span className="user-navbar__avatar">{initials}</span>
+            <span className="user-navbar__avatar">
+              {profilePhoto ? <img src={profilePhoto} alt="Foto profil" /> : initials}
+            </span>
             <span className="user-navbar__name">{safeName}</span>
           </Dropdown.Toggle>
           <Dropdown.Menu className="user-navbar__menu">
             <Dropdown.Header>Profil</Dropdown.Header>
-            <Dropdown.Item>Profil Utama</Dropdown.Item>
-            <Dropdown.Item>Profil Kedua</Dropdown.Item>
-            <Dropdown.Item disabled>Tambah Profil (segera)</Dropdown.Item>
+            <Dropdown.Item onClick={() => navigate(`/${accountUsername}/dashboard/profile`)}>
+              Profil
+            </Dropdown.Item>
+            <Dropdown.Item onClick={() => navigate(`/${accountUsername}/dashboard/email`)}>
+              Ubah Email
+            </Dropdown.Item>
+            <Dropdown.Item onClick={() => navigate(`/${accountUsername}/dashboard/password`)}>
+              Ubah Kata Sandi
+            </Dropdown.Item>
             <Dropdown.Divider />
             <Dropdown.Item onClick={handleLogout} className="text-danger">
               Logout

@@ -1,8 +1,14 @@
-import { FiGrid, FiLink2, FiSettings } from 'react-icons/fi';
+import { FiGrid, FiHome, FiLink2, FiSettings } from 'react-icons/fi';
 import { NavLink } from 'react-router-dom';
 
 const UserSidebar = ({ basePath, isOpen }) => {
   const navItems = [
+    {
+      label: 'Ringkasan',
+      to: basePath,
+      icon: FiHome,
+      end: true,
+    },
     {
       label: 'Konfigurasi Endpoint',
       to: `${basePath}/endpoint`,
@@ -30,6 +36,7 @@ const UserSidebar = ({ basePath, isOpen }) => {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               className={({ isActive }) =>
                 `user-sidebar__link ${isActive ? 'is-active' : ''}`
               }

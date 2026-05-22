@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Alert, Button, Form } from 'react-bootstrap';
 import { FiShield } from 'react-icons/fi';
 import SuccessModal from './SuccessModal';
+import { getAuthToken, savePassword as savePasswordApi } from './userApi';
 
 const ChangePasswordPage = () => {
   const [newPassword, setNewPassword] = useState('');
@@ -9,7 +10,7 @@ const ChangePasswordPage = () => {
   const [status, setStatus] = useState({ type: 'info', message: 'Gunakan kata sandi baru minimal 8 karakter.' });
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const savePassword = (event) => {
+  const savePassword = async (event) => {
     event.preventDefault();
 
     if (newPassword.length < 8) {
@@ -22,11 +23,19 @@ const ChangePasswordPage = () => {
       return;
     }
 
-    localStorage.setItem('mc_v2_password', newPassword);
-    setNewPassword('');
-    setConfirmPassword('');
-    setStatus({ type: 'success', message: 'Kata sandi berhasil diperbarui.' });
-    setShowSuccess(true);
+    try {
+      if (getAuthToken()) {
+        await savePasswordApi({ newPassword });
+      } else {
+        localStorage.setItem('mc_v2_password', newPassword);
+      }
+      setNewPassword('');
+      setConfirmPassword('');
+      setStatus({ type: 'success', message: 'Kata sandi berhasil diperbarui.' });
+      setShowSuccess(true);
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Kata sandi gagal diperbarui.' });
+    }
   };
 
   return (

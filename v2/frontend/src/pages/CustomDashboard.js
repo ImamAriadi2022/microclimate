@@ -3,6 +3,7 @@ import { Alert, Badge, Button, Card, Container } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import CustomStation2 from '../components/custom/CustomStation2';
 import { getTemplateById } from '../features/station-template/stationTemplates';
+import { fetchPublicDashboardLink } from '../features/user-dashboard/userApi';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';
 const UI_KEY = 'mc_v2_dashboard_link_ui';
@@ -47,14 +48,17 @@ const CustomDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedLinks = localStorage.getItem(STORAGE_KEY);
-    const savedConfigs = localStorage.getItem('mc_v2_user_configs');
-    const savedUi = localStorage.getItem(UI_KEY);
-    if (!savedLinks) {
-      setIsLoading(false);
-      return;
-    }
-    try {
+    let cancelled = false;
+
+    const loadLocal = () => {
+      const savedLinks = localStorage.getItem(STORAGE_KEY);
+      const savedConfigs = localStorage.getItem('mc_v2_user_configs');
+      const savedUi = localStorage.getItem(UI_KEY);
+      if (!savedLinks) {
+        setIsLoading(false);
+        return;
+      }
+      try {
       const parsedLinks = JSON.parse(savedLinks);
       const foundLink = parsedLinks.find(
         (item) => item.slug === slug && item.templateId === template
@@ -91,12 +95,32 @@ const CustomDashboard = () => {
       } else {
         setConfigData(null);
       }
-    } catch (_error) {
-      setLinkData(null);
-      setConfigData(null);
-      setUiSettings(DEFAULT_UI);
-    }
-    setIsLoading(false);
+      } catch (_error) {
+        setLinkData(null);
+        setConfigData(null);
+        setUiSettings(DEFAULT_UI);
+      }
+      setIsLoading(false);
+    };
+
+    setIsLoading(true);
+    fetchPublicDashboardLink(template, slug)
+      .then((data) => {
+        if (cancelled) return;
+        setLinkData(data.link || null);
+        setConfigData(data.config || null);
+        setUiSettings(DEFAULT_UI);
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          loadLocal();
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [slug, template]);
 
   const isPublished = Boolean(linkData?.published);

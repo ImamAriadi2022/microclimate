@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Form, ListGroup, Stack } from 'react-bootstrap';
 import { stationTemplates } from '../station-template/stationTemplates';
 import { useParams } from 'react-router-dom';
+import {
+  deleteDashboardLink,
+  getAuthToken,
+  listDashboardLinks,
+  listEndpointConfigs,
+  publishDashboardLink,
+  saveDashboardLink,
+} from '../user-dashboard/userApi';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';
 const CONFIG_KEY = 'mc_v2_user_configs';
@@ -48,12 +56,24 @@ const DashboardLinksPanel = () => {
           configId: '',
         },
       ]);
-      return;
-    }
-    try {
+    } else {
+      try {
       setLinks(JSON.parse(saved));
-    } catch (error) {
-      setStatus({ type: 'warning', message: 'Simulasi: data link tidak terbaca.' });
+      } catch (error) {
+        setStatus({ type: 'warning', message: 'Simulasi: data link tidak terbaca.' });
+      }
+    }
+
+    if (getAuthToken()) {
+      listDashboardLinks()
+        .then((data) => {
+          const remoteLinks = data.result || [];
+          setLinks(remoteLinks);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteLinks));
+        })
+        .catch(() => {
+          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Menampilkan link lokal.' });
+        });
     }
   }, []);
 
@@ -69,6 +89,21 @@ const DashboardLinksPanel = () => {
     }
     if (savedActive) {
       setActiveConfigId(savedActive);
+    }
+
+    if (getAuthToken()) {
+      listEndpointConfigs()
+        .then((data) => {
+          const remoteConfigs = data.result || [];
+          setConfigs(remoteConfigs);
+          localStorage.setItem(CONFIG_KEY, JSON.stringify(remoteConfigs));
+          const activeConfig = remoteConfigs.find((item) => item.isActive);
+          if (activeConfig) {
+            setActiveConfigId(activeConfig.id);
+            localStorage.setItem(ACTIVE_CONFIG_KEY, activeConfig.id);
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -99,7 +134,7 @@ const DashboardLinksPanel = () => {
     setStatus({ type: 'info', message: 'Kembali ke daftar link.' });
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const cleanName = name.trim();
     let cleanSlug = slug.trim().toLowerCase();
@@ -134,14 +169,19 @@ const DashboardLinksPanel = () => {
       configId,
     };
 
-    const nextLinks = editingId
-      ? links.map((item) => (item.id === editingId ? payload : item))
-      : [payload, ...links];
+    try {
+      const saved = getAuthToken() ? (await saveDashboardLink(payload)).result : payload;
+      const nextLinks = editingId
+        ? links.map((item) => (item.id === editingId ? saved : item))
+        : [saved, ...links];
 
-    persistLinks(nextLinks);
-    setStatus({ type: 'success', message: 'Simulasi: link dashboard disimpan.' });
-    resetForm();
-    setShowForm(false);
+      persistLinks(nextLinks);
+      setStatus({ type: 'success', message: 'Link dashboard disimpan ke backend user.' });
+      resetForm();
+      setShowForm(false);
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Link dashboard gagal disimpan.' });
+    }
   };
 
   const handleEdit = (item) => {
@@ -154,10 +194,17 @@ const DashboardLinksPanel = () => {
     setStatus({ type: 'info', message: 'Mode edit: ubah data lalu simpan.' });
   };
 
-  const handleRemove = (id) => {
-    const nextLinks = links.filter((item) => item.id !== id);
-    persistLinks(nextLinks);
-    setStatus({ type: 'info', message: 'Simulasi: link dashboard dihapus.' });
+  const handleRemove = async (id) => {
+    try {
+      if (getAuthToken()) {
+        await deleteDashboardLink(id);
+      }
+      const nextLinks = links.filter((item) => item.id !== id);
+      persistLinks(nextLinks);
+      setStatus({ type: 'info', message: 'Link dashboard dihapus.' });
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Gagal menghapus link dashboard.' });
+    }
   };
 
   const handleCopy = async (template, itemSlug) => {
@@ -175,18 +222,23 @@ const DashboardLinksPanel = () => {
     window.open(link, '_blank', 'noopener,noreferrer');
   };
 
-  const handlePublish = (id) => {
+  const handlePublish = async (id) => {
     const target = links.find((item) => item.id === id);
     if (!target) return;
     if (target.published) {
       setStatus({ type: 'info', message: 'Link ini sudah dipublikasikan.' });
       return;
     }
-    const nextLinks = links.map((item) =>
-      item.id === id ? { ...item, published: true } : item
-    );
-    persistLinks(nextLinks);
-    setStatus({ type: 'success', message: 'Simulasi: link dipublikasikan.' });
+    try {
+      const published = getAuthToken() ? (await publishDashboardLink(id)).result : { ...target, published: true };
+      const nextLinks = links.map((item) =>
+        item.id === id ? { ...item, ...published, published: true } : item
+      );
+      persistLinks(nextLinks);
+      setStatus({ type: 'success', message: 'Link dipublikasikan.' });
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Gagal mempublikasikan link.' });
+    }
   };
 
   const getConfigLabel = (id) => configs.find((item) => item.id === id)?.name || '-';
@@ -273,7 +325,7 @@ const DashboardLinksPanel = () => {
         <Card.Title>Dashboard Link</Card.Title>
         <Card.Text>Buat link dashboard custom berbasis template Microclimate</Card.Text>
         <Alert variant={status.type || 'info'}>
-          {status.message || 'Panel simulasi: data disimpan lokal.'}
+          {status.message || 'Data link tersimpan di backend user v2 saat login tersedia.'}
         </Alert>
         {!showForm ? (
           <div className="mt-2">{renderLinkList()}</div>

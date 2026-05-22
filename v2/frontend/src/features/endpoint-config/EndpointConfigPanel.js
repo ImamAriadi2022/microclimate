@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Stack } from 'react-bootstrap';
 import { getTemplateById, stationTemplates } from '../station-template/stationTemplates';
+import {
+  activateEndpointConfig,
+  deleteEndpointConfig,
+  getAuthToken,
+  listEndpointConfigs,
+  saveEndpointConfig,
+} from '../user-dashboard/userApi';
 
 const STORAGE_KEY = 'mc_v2_user_configs';
 const ACTIVE_KEY = 'mc_v2_active_config_id';
@@ -93,6 +100,23 @@ const EndpointConfigPanel = () => {
     if (savedActive) {
       setActiveId(savedActive);
     }
+
+    if (getAuthToken()) {
+      listEndpointConfigs()
+        .then((data) => {
+          const remoteConfigs = data.result || [];
+          setConfigs(remoteConfigs);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteConfigs));
+          const activeConfig = remoteConfigs.find((item) => item.isActive);
+          if (activeConfig) {
+            setActiveId(activeConfig.id);
+            localStorage.setItem(ACTIVE_KEY, activeConfig.id);
+          }
+        })
+        .catch(() => {
+          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Menampilkan data lokal.' });
+        });
+    }
   }, []);
 
   useEffect(() => {
@@ -143,7 +167,7 @@ const EndpointConfigPanel = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     const cleanName = sanitizeName(name);
     if (!cleanName) {
@@ -187,16 +211,24 @@ const EndpointConfigPanel = () => {
       updatedAt: new Date().toISOString(),
     };
 
-    const nextConfigs = editingId
-      ? configs.map((item) => (item.id === editingId ? payload : item))
-      : [payload, ...configs];
+    try {
+      const saved = getAuthToken() ? (await saveEndpointConfig(payload)).result : payload;
+      const nextConfigs = editingId
+        ? configs.map((item) => (item.id === editingId ? saved : item))
+        : [saved, ...configs];
 
-    persistConfigs(nextConfigs);
-    setActiveId(payload.id);
-    localStorage.setItem(ACTIVE_KEY, payload.id);
-    setStatus({ type: 'success', message: 'Simulasi: konfigurasi disimpan.' });
-    resetForm();
-    setShowForm(false);
+      persistConfigs(nextConfigs);
+      if (getAuthToken()) {
+        await activateEndpointConfig(saved.id);
+      }
+      setActiveId(saved.id);
+      localStorage.setItem(ACTIVE_KEY, saved.id);
+      setStatus({ type: 'success', message: 'Konfigurasi disimpan ke backend user.' });
+      resetForm();
+      setShowForm(false);
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Konfigurasi gagal disimpan.' });
+    }
   };
 
   const handleEdit = (config) => {
@@ -221,20 +253,36 @@ const EndpointConfigPanel = () => {
     setShowForm(true);
   };
 
-  const handleActivate = (configId) => {
-    setActiveId(configId);
-    localStorage.setItem(ACTIVE_KEY, configId);
-    setStatus({ type: 'success', message: 'Konfigurasi aktif diperbarui.' });
+  const handleActivate = async (configId) => {
+    try {
+      if (getAuthToken()) {
+        await activateEndpointConfig(configId);
+      }
+      const next = configs.map((item) => ({ ...item, isActive: item.id === configId }));
+      persistConfigs(next);
+      setActiveId(configId);
+      localStorage.setItem(ACTIVE_KEY, configId);
+      setStatus({ type: 'success', message: 'Konfigurasi aktif diperbarui.' });
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Gagal mengaktifkan konfigurasi.' });
+    }
   };
 
-  const handleRemove = (configId) => {
-    const next = configs.filter((item) => item.id !== configId);
-    persistConfigs(next);
-    if (activeId === configId) {
-      setActiveId('');
-      localStorage.removeItem(ACTIVE_KEY);
+  const handleRemove = async (configId) => {
+    try {
+      if (getAuthToken()) {
+        await deleteEndpointConfig(configId);
+      }
+      const next = configs.filter((item) => item.id !== configId);
+      persistConfigs(next);
+      if (activeId === configId) {
+        setActiveId('');
+        localStorage.removeItem(ACTIVE_KEY);
+      }
+      setStatus({ type: 'info', message: 'Konfigurasi dihapus.' });
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Gagal menghapus konfigurasi.' });
     }
-    setStatus({ type: 'info', message: 'Konfigurasi dihapus.' });
   };
 
   const handleEndpointChange = (key, value) => {
@@ -493,7 +541,7 @@ const EndpointConfigPanel = () => {
           Pilih backend atau MQTT, lalu sesuaikan endpoint sesuai kebutuhan template.
         </Card.Text>
         <Alert variant={status.type || 'info'}>
-          {status.message || 'Panel simulasi: data disimpan lokal.'}
+          {status.message || 'Data tersimpan di backend user v2 saat login tersedia.'}
         </Alert>
         {!showForm ? (
           <div className="mt-3">{renderConfigList()}</div>

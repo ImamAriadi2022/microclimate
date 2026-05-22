@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, Button, Col, Form, Row } from 'react-bootstrap';
 import { FiCamera, FiSave } from 'react-icons/fi';
 import SuccessModal from './SuccessModal';
+import { getAuthToken, saveProfile as saveProfileApi, storeUser } from './userApi';
 
 const ProfilePage = ({ onProfileChange }) => {
   const fileInputRef = useRef(null);
@@ -38,7 +39,7 @@ const ProfilePage = ({ onProfileChange }) => {
     reader.readAsDataURL(file);
   };
 
-  const saveProfile = (event) => {
+  const saveProfile = async (event) => {
     event.preventDefault();
     const cleanName = fullName.trim();
     const cleanUsername = username
@@ -58,13 +59,27 @@ const ProfilePage = ({ onProfileChange }) => {
       return;
     }
 
-    localStorage.setItem('mc_v2_display_name', cleanName);
-    localStorage.setItem('mc_v2_username', cleanUsername);
-    localStorage.setItem('mc_v2_profile_photo', photo);
-    setUsername(cleanUsername);
-    onProfileChange?.(cleanName);
-    setStatus({ type: 'success', message: 'Profil berhasil diperbarui.' });
-    setShowSuccess(true);
+    try {
+      if (getAuthToken()) {
+        const result = await saveProfileApi({
+          fullName: cleanName,
+          username: cleanUsername,
+          profilePhoto: photo,
+        });
+        storeUser(result.user);
+      } else {
+        localStorage.setItem('mc_v2_display_name', cleanName);
+        localStorage.setItem('mc_v2_username', cleanUsername);
+        localStorage.setItem('mc_v2_profile_photo', photo);
+      }
+
+      setUsername(cleanUsername);
+      onProfileChange?.(cleanName);
+      setStatus({ type: 'success', message: 'Profil berhasil diperbarui.' });
+      setShowSuccess(true);
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Profil gagal diperbarui.' });
+    }
   };
 
   return (

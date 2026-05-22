@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Container, Dropdown, Navbar } from 'react-bootstrap';
 import { FiMenu } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { clearAuthSession } from './userApi';
 
 const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
   const navigate = useNavigate();
@@ -11,6 +12,7 @@ const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
   const profilePhoto = localStorage.getItem('mc_v2_profile_photo') || '';
 
   const handleLogout = () => {
+    clearAuthSession();
     localStorage.removeItem('mc_v2_login_email');
     localStorage.removeItem('mc_v2_username');
     localStorage.removeItem('mc_v2_display_name');

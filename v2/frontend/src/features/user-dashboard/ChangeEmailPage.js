@@ -3,6 +3,7 @@ import { Alert, Button, Form } from 'react-bootstrap';
 import { FiMail, FiSave } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import SuccessModal from './SuccessModal';
+import { getAuthToken, saveEmail as saveEmailApi, storeUser } from './userApi';
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -26,7 +27,7 @@ const ChangeEmailPage = () => {
   const [showSuccess, setShowSuccess] = useState(false);
   const [nextPath, setNextPath] = useState('');
 
-  const saveEmail = (event) => {
+  const saveEmail = async (event) => {
     event.preventDefault();
     const cleanOldEmail = oldEmail.trim().toLowerCase();
     const cleanNewEmail = newEmail.trim().toLowerCase();
@@ -46,13 +47,23 @@ const ChangeEmailPage = () => {
       return;
     }
 
-    const nextUsername = buildUsername(cleanNewEmail);
-    localStorage.setItem('mc_v2_login_email', cleanNewEmail);
-    localStorage.setItem('mc_v2_username', nextUsername);
-    setStatus({ type: 'success', message: 'Email berhasil diperbarui.' });
-    setNewEmail('');
-    setNextPath(`/${nextUsername || username}/dashboard/email`);
-    setShowSuccess(true);
+    try {
+      let nextUsername = buildUsername(cleanNewEmail);
+      if (getAuthToken()) {
+        const result = await saveEmailApi({ oldEmail: cleanOldEmail, newEmail: cleanNewEmail });
+        storeUser(result.user);
+        nextUsername = result.user?.username || nextUsername;
+      } else {
+        localStorage.setItem('mc_v2_login_email', cleanNewEmail);
+        localStorage.setItem('mc_v2_username', nextUsername);
+      }
+      setStatus({ type: 'success', message: 'Email berhasil diperbarui.' });
+      setNewEmail('');
+      setNextPath(`/${nextUsername || username}/dashboard/email`);
+      setShowSuccess(true);
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Email gagal diperbarui.' });
+    }
   };
 
   const closeSuccess = () => {

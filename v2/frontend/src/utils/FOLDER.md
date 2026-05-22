@@ -1,1 +1,0 @@
-﻿# FOLDER: utils  ## Tujuan Frontend React untuk halaman landing, dashboard station, dan fitur user v2.  ## Catatan - File ini menjelaskan fungsi folder dalam struktur v2. - Hindari menaruh logic lintas-domain tanpa alasan kuat.

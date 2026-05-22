@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Button, Form, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { loginAccount, registerAccount, storeAuthSession } from '../user-dashboard/userApi';
 
 const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!show) return;
@@ -27,7 +29,7 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
     return normalized || 'user';
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!email || !password) {
       setStatus({ type: 'danger', message: 'Email dan password wajib diisi.' });
@@ -41,23 +43,45 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
       setStatus({ type: 'danger', message: 'Konfirmasi password tidak sama.' });
       return;
     }
-    const username = buildUsername(email.trim());
-    const displayName = fullName.trim() || username;
-    localStorage.setItem('mc_v2_login_email', email.trim());
-    localStorage.setItem('mc_v2_username', username);
-    localStorage.setItem('mc_v2_display_name', displayName);
-    if (mode === 'register') {
-      localStorage.setItem('mc_v2_password', password);
+    setIsSubmitting(true);
+
+    try {
+      const payload = { email: email.trim(), password, fullName: fullName.trim() };
+      const result = mode === 'register'
+        ? await registerAccount(payload)
+        : await loginAccount(payload);
+      const username = result.user?.username || buildUsername(email.trim());
+
+      storeAuthSession(result);
+      setStatus({
+        type: 'success',
+        message:
+          mode === 'register'
+            ? 'Daftar berhasil. Mengarah ke dashboard user.'
+            : 'Login berhasil. Mengarah ke dashboard user.',
+      });
+      onHide();
+      navigate(`/${username}/dashboard/endpoint`);
+    } catch (error) {
+      if (!error.status) {
+        const username = buildUsername(email.trim());
+        const displayName = fullName.trim() || username;
+        localStorage.setItem('mc_v2_login_email', email.trim());
+        localStorage.setItem('mc_v2_username', username);
+        localStorage.setItem('mc_v2_display_name', displayName);
+        if (mode === 'register') {
+          localStorage.setItem('mc_v2_password', password);
+        }
+        setStatus({ type: 'warning', message: 'Backend login belum tersedia. Memakai mode lokal sementara.' });
+        onHide();
+        navigate(`/${username}/dashboard/endpoint`);
+        return;
+      }
+
+      setStatus({ type: 'danger', message: error.message || 'Login gagal.' });
+    } finally {
+      setIsSubmitting(false);
     }
-    setStatus({
-      type: 'success',
-      message:
-        mode === 'register'
-          ? 'Daftar simulasi berhasil. Mengarah ke dashboard user.'
-          : 'Login simulasi berhasil. Mengarah ke dashboard user.',
-    });
-    onHide();
-    navigate(`/${username}/dashboard/endpoint`);
   };
 
   return (
@@ -67,7 +91,7 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
       </Modal.Header>
       <Modal.Body>
         <Alert variant={status.type || 'info'}>
-          {status.message || 'Fitur login simulasi: belum terhubung ke backend.'}
+          {status.message || 'Login terhubung ke backend user v2.'}
         </Alert>
         <Form onSubmit={handleSubmit}>
           {mode === 'register' && (
@@ -119,8 +143,8 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
             className="mb-3"
             label="Ingat saya di perangkat ini"
           />
-          <Button type="submit" variant="primary" className="w-100">
-            {mode === 'register' ? 'Daftar' : 'Login'}
+          <Button type="submit" variant="primary" className="w-100" disabled={isSubmitting}>
+            {isSubmitting ? 'Memproses...' : mode === 'register' ? 'Daftar' : 'Login'}
           </Button>
         </Form>
         <div className="text-center mt-3">

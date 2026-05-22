@@ -1,8 +1,17 @@
 const DEFAULT_API_BASE_URL = 'https://full-climate-tawny.vercel.app';
+const DEFAULT_USER_API_BASE_URL = 'http://localhost:3001';
 
-const normalizeBaseUrl = (value) => (value || DEFAULT_API_BASE_URL).replace(/\/$/, '');
+const normalizeBaseUrl = (value, fallback) => (value || fallback).replace(/\/$/, '');
 
-export const API_BASE_URL = normalizeBaseUrl(process.env.REACT_APP_API_BASE_URL);
+export const API_BASE_URL = normalizeBaseUrl(
+  process.env.REACT_APP_API_BASE_URL,
+  DEFAULT_API_BASE_URL
+);
+
+export const USER_API_BASE_URL = normalizeBaseUrl(
+  process.env.REACT_APP_USER_API_BASE_URL,
+  DEFAULT_USER_API_BASE_URL
+);
 
 const buildEndpoint = (envValue, fallbackPath) =>
   envValue || `${API_BASE_URL}${fallbackPath}`;

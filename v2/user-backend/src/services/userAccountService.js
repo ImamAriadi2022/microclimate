@@ -41,12 +41,10 @@ const mapUniqueError = (error) => {
 const createSession = async (pool, userId) => {
   const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
-
   await pool.query(
     `INSERT INTO mc_user_sessions (id, user_id, token_hash, expires_at)
-     VALUES (?, ?, ?, ?)`,
-    [crypto.randomUUID(), userId, tokenHash, expiresAt]
+     VALUES (?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 30 DAY))`,
+    [crypto.randomUUID(), userId, tokenHash]
   );
 
   return token;
@@ -115,7 +113,7 @@ const getUserByToken = async (pool, token) => {
     `SELECT u.*
      FROM mc_user_sessions s
      JOIN mc_users u ON u.id = s.user_id
-     WHERE s.token_hash = ? AND s.expires_at > NOW()
+    WHERE s.token_hash = ? AND s.expires_at > UTC_TIMESTAMP()
      LIMIT 1`,
     [tokenHash]
   );

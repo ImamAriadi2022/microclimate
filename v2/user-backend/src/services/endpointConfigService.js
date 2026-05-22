@@ -51,7 +51,7 @@ const listEndpointConfigs = async (pool, userId) => {
   const result = await pool.query(
     `SELECT *
      FROM mc_endpoint_configs
-     WHERE user_id = $1
+     WHERE user_id = ?
      ORDER BY updated_at DESC`,
     [userId]
   );
@@ -63,26 +63,27 @@ const upsertEndpointConfig = async (pool, userId, payload) => {
   ensurePool(pool);
 
   const config = validateConfigPayload(payload);
+  const id = crypto.randomUUID();
   const result = await pool.query(
     `INSERT INTO mc_endpoint_configs (
-       user_id, client_id, name, source_type, template_id, base_url, broker_url,
+       id, user_id, client_id, name, source_type, template_id, base_url, broker_url,
        endpoint_map, topic_map, use_single_endpoint, client_resample, is_active
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, false)
-     ON CONFLICT (user_id, client_id)
-     DO UPDATE SET
-       name = EXCLUDED.name,
-       source_type = EXCLUDED.source_type,
-       template_id = EXCLUDED.template_id,
-       base_url = EXCLUDED.base_url,
-       broker_url = EXCLUDED.broker_url,
-       endpoint_map = EXCLUDED.endpoint_map,
-       topic_map = EXCLUDED.topic_map,
-       use_single_endpoint = EXCLUDED.use_single_endpoint,
-       client_resample = EXCLUDED.client_resample,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false)
+     ON DUPLICATE KEY UPDATE
+       name = VALUES(name),
+       source_type = VALUES(source_type),
+       template_id = VALUES(template_id),
+       base_url = VALUES(base_url),
+       broker_url = VALUES(broker_url),
+       endpoint_map = VALUES(endpoint_map),
+       topic_map = VALUES(topic_map),
+       use_single_endpoint = VALUES(use_single_endpoint),
+       client_resample = VALUES(client_resample),
        updated_at = NOW()
-     RETURNING *`,
+     `,
     [
+      id,
       userId,
       config.clientId,
       config.name,
@@ -97,14 +98,19 @@ const upsertEndpointConfig = async (pool, userId, payload) => {
     ]
   );
 
-  return toConfigResponse(result.rows[0]);
+  const saved = await pool.query(
+    "SELECT * FROM mc_endpoint_configs WHERE user_id = ? AND client_id = ?",
+    [userId, config.clientId]
+  );
+
+  return toConfigResponse(saved.rows[0] || result.rows[0]);
 };
 
 const activateEndpointConfig = async (pool, userId, clientId) => {
   ensurePool(pool);
 
   const found = await pool.query(
-    "SELECT id FROM mc_endpoint_configs WHERE user_id = $1 AND client_id = $2",
+    "SELECT id FROM mc_endpoint_configs WHERE user_id = ? AND client_id = ?",
     [userId, clientId]
   );
 
@@ -112,28 +118,32 @@ const activateEndpointConfig = async (pool, userId, clientId) => {
     throw new ApiError(404, "Konfigurasi tidak ditemukan.");
   }
 
-  await pool.query("UPDATE mc_endpoint_configs SET is_active = false WHERE user_id = $1", [userId]);
+  await pool.query("UPDATE mc_endpoint_configs SET is_active = false WHERE user_id = ?", [userId]);
   const result = await pool.query(
     `UPDATE mc_endpoint_configs
      SET is_active = true,
          updated_at = NOW()
-     WHERE user_id = $1 AND client_id = $2
-     RETURNING *`,
+     WHERE user_id = ? AND client_id = ?`,
     [userId, clientId]
   );
 
-  return toConfigResponse(result.rows[0]);
+  const updated = await pool.query(
+    "SELECT * FROM mc_endpoint_configs WHERE user_id = ? AND client_id = ?",
+    [userId, clientId]
+  );
+
+  return toConfigResponse(updated.rows[0] || result.rows[0]);
 };
 
 const deleteEndpointConfig = async (pool, userId, clientId) => {
   ensurePool(pool);
 
   const result = await pool.query(
-    "DELETE FROM mc_endpoint_configs WHERE user_id = $1 AND client_id = $2 RETURNING client_id",
+    "DELETE FROM mc_endpoint_configs WHERE user_id = ? AND client_id = ?",
     [userId, clientId]
   );
 
-  if (!result.rows[0]) {
+  if (result.affectedRows === 0) {
     throw new ApiError(404, "Konfigurasi tidak ditemukan.");
   }
 };

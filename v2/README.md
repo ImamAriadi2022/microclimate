@@ -51,6 +51,8 @@ Endpoint fitur user:
 - `PATCH /user/dashboard-links/:id/publish`
 - `DELETE /user/dashboard-links/:id`
 - `GET /public/dashboard-links/:template/:slug`
+- `GET /docs`
+- `GET /docs.json`
 
 Jalankan:
 
@@ -62,29 +64,51 @@ npm run dev
 
 Default port user backend adalah `3001`.
 
-## SQL Localhost
+## Database User Backend
 
-File SQL siap import:
+Backend user v2 akan memakai MySQL. Env lokal sudah disiapkan di:
 
 ```text
-v2/user-backend/sql/001_user_features.sql
+v2/user-backend/.env
 ```
 
-Contoh import PostgreSQL lokal:
+Template yang aman untuk repo:
 
-```bash
-psql -U postgres -d microclimate_user -f v2/user-backend/sql/001_user_features.sql
+```text
+v2/user-backend/.env.example
 ```
 
 Env minimal untuk `user-backend/.env`:
 
 ```env
 PORT=3001
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=postgres
-DB_NAME_USER=microclimate_user
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=
+MYSQL_DATABASE=microclimate_user
+MYSQL_CONNECTION_LIMIT=10
+MYSQL_CONNECT_TIMEOUT_MS=5000
+MYSQL_QUERY_TIMEOUT_MS=10000
+```
+
+File SQL MySQL siap import:
+
+```text
+v2/user-backend/sql/001_user_features.sql
+```
+
+Contoh import MySQL lokal:
+
+```bash
+mysql -u root -p < v2/user-backend/sql/001_user_features.sql
+```
+
+Dokumentasi Swagger backend user:
+
+```text
+http://localhost:3001/docs
+http://localhost:3001/docs.json
 ```
 
 ## Frontend Env
@@ -98,6 +122,7 @@ REACT_APP_USER_API_BASE_URL=http://localhost:3001
 
 - `REACT_APP_API_BASE_URL`: backend data publik tanpa login.
 - `REACT_APP_USER_API_BASE_URL`: backend login/config/dashboard link.
+- Env lama seperti `REACT_APP_API_PETENGORAN_GET_TOPIC4`, `REACT_APP_API_PETENGORAN_GET_TOPIC5`, dan env Kalimantan tetap didukung oleh frontend. Jangan hapus env tersebut dari deployment lama; cukup tambahkan `REACT_APP_USER_API_BASE_URL` untuk fitur login.
 
 Jalankan:
 

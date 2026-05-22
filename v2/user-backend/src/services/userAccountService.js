@@ -32,7 +32,7 @@ const ensurePool = (pool) => {
 };
 
 const mapUniqueError = (error) => {
-  if (error && error.code === "23505") {
+  if (error && ["23505", "ER_DUP_ENTRY"].includes(error.code)) {
     throw new ApiError(409, "Email atau username sudah terdaftar.");
   }
   throw error;
@@ -44,9 +44,9 @@ const createSession = async (pool, userId) => {
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString();
 
   await pool.query(
-    `INSERT INTO mc_user_sessions (user_id, token_hash, expires_at)
-     VALUES ($1, $2, $3)`,
-    [userId, tokenHash, expiresAt]
+    `INSERT INTO mc_user_sessions (id, user_id, token_hash, expires_at)
+     VALUES (?, ?, ?, ?)`,
+    [crypto.randomUUID(), userId, tokenHash, expiresAt]
   );
 
   return token;
@@ -74,13 +74,14 @@ const registerUser = async (pool, payload) => {
   }
 
   try {
+    const userId = crypto.randomUUID();
     const result = await pool.query(
-      `INSERT INTO mc_users (email, username, full_name, password_hash)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [email, username, fullName, hashPassword(password)]
+      `INSERT INTO mc_users (id, email, username, full_name, password_hash)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, email, username, fullName, hashPassword(password)]
     );
-    const user = result.rows[0];
+    const created = await pool.query("SELECT * FROM mc_users WHERE id = ?", [userId]);
+    const user = created.rows[0] || result.rows[0];
     const token = await createSession(pool, user.id);
 
     return { token, user: toUserResponse(user) };
@@ -95,7 +96,7 @@ const loginUser = async (pool, payload) => {
   const email = normalizeEmail(payload.email);
   const password = String(payload.password || "");
 
-  const result = await pool.query("SELECT * FROM mc_users WHERE email = $1", [email]);
+  const result = await pool.query("SELECT * FROM mc_users WHERE email = ?", [email]);
   const user = result.rows[0];
 
   if (!user || !verifyPassword(password, user.password_hash)) {
@@ -114,7 +115,7 @@ const getUserByToken = async (pool, token) => {
     `SELECT u.*
      FROM mc_user_sessions s
      JOIN mc_users u ON u.id = s.user_id
-     WHERE s.token_hash = $1 AND s.expires_at > NOW()
+     WHERE s.token_hash = ? AND s.expires_at > NOW()
      LIMIT 1`,
     [tokenHash]
   );
@@ -139,16 +140,16 @@ const updateProfile = async (pool, userId, payload) => {
   try {
     const result = await pool.query(
       `UPDATE mc_users
-       SET full_name = $2,
-           username = $3,
-           profile_photo = $4,
+       SET full_name = ?,
+           username = ?,
+           profile_photo = ?,
            updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [userId, fullName, username, profilePhoto]
+       WHERE id = ?`,
+      [fullName, username, profilePhoto, userId]
     );
 
-    return toUserResponse(result.rows[0]);
+    const updated = await pool.query("SELECT * FROM mc_users WHERE id = ?", [userId]);
+    return toUserResponse(updated.rows[0] || result.rows[0]);
   } catch (error) {
     mapUniqueError(error);
   }
@@ -167,7 +168,7 @@ const updateEmail = async (pool, userId, payload) => {
     throw new ApiError(400, "Email baru tidak boleh sama dengan email lama.");
   }
 
-  const current = await pool.query("SELECT email FROM mc_users WHERE id = $1", [userId]);
+  const current = await pool.query("SELECT email FROM mc_users WHERE id = ?", [userId]);
   if (!current.rows[0] || current.rows[0].email !== oldEmail) {
     throw new ApiError(400, "Email lama tidak sesuai dengan email akun saat ini.");
   }
@@ -175,15 +176,15 @@ const updateEmail = async (pool, userId, payload) => {
   try {
     const result = await pool.query(
       `UPDATE mc_users
-       SET email = $2,
-           username = $3,
+       SET email = ?,
+           username = ?,
            updated_at = NOW()
-       WHERE id = $1
-       RETURNING *`,
-      [userId, newEmail, buildUsername(newEmail)]
+       WHERE id = ?`,
+      [newEmail, buildUsername(newEmail), userId]
     );
 
-    return toUserResponse(result.rows[0]);
+    const updated = await pool.query("SELECT * FROM mc_users WHERE id = ?", [userId]);
+    return toUserResponse(updated.rows[0] || result.rows[0]);
   } catch (error) {
     mapUniqueError(error);
   }
@@ -199,10 +200,10 @@ const updatePassword = async (pool, userId, payload) => {
 
   await pool.query(
     `UPDATE mc_users
-     SET password_hash = $2,
+     SET password_hash = ?,
          updated_at = NOW()
-     WHERE id = $1`,
-    [userId, hashPassword(newPassword)]
+     WHERE id = ?`,
+    [hashPassword(newPassword), userId]
   );
 };
 

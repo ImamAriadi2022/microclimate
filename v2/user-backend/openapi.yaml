@@ -1,0 +1,389 @@
+openapi: 3.0.3
+info:
+  title: Microclimate User Backend API
+  version: 1.0.0
+  description: API untuk login, profil, konfigurasi data source, dan dashboard link custom v2.
+servers:
+  - url: http://localhost:3001
+    description: Local user backend
+tags:
+  - name: Health
+  - name: Auth
+  - name: Profile
+  - name: Endpoint Configs
+  - name: Dashboard Links
+  - name: Public Dashboard
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Cek status service dan database
+      responses:
+        "200":
+          description: Service aktif
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrasi akun user dashboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Akun berhasil dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user dashboard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /me:
+    get:
+      tags: [Profile]
+      summary: Ambil profil user login
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Profil user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /me/profile:
+    patch:
+      tags: [Profile]
+      summary: Update profil user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdateRequest"
+      responses:
+        "200":
+          description: Profil diperbarui
+  /me/email:
+    patch:
+      tags: [Profile]
+      summary: Update email user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailUpdateRequest"
+      responses:
+        "200":
+          description: Email diperbarui
+  /me/password:
+    patch:
+      tags: [Profile]
+      summary: Update password user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordUpdateRequest"
+      responses:
+        "200":
+          description: Password diperbarui
+  /user/configs:
+    get:
+      tags: [Endpoint Configs]
+      summary: List konfigurasi data source user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar konfigurasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EndpointConfig"
+    post:
+      tags: [Endpoint Configs]
+      summary: Simpan atau update konfigurasi data source
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EndpointConfig"
+      responses:
+        "200":
+          description: Konfigurasi tersimpan
+  /user/configs/{id}/active:
+    patch:
+      tags: [Endpoint Configs]
+      summary: Aktifkan konfigurasi data source
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Konfigurasi aktif diperbarui
+  /user/configs/{id}:
+    delete:
+      tags: [Endpoint Configs]
+      summary: Hapus konfigurasi data source
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "204":
+          description: Konfigurasi dihapus
+  /user/dashboard-links:
+    get:
+      tags: [Dashboard Links]
+      summary: List dashboard link milik user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Daftar dashboard link
+    post:
+      tags: [Dashboard Links]
+      summary: Simpan atau update dashboard link
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DashboardLink"
+      responses:
+        "200":
+          description: Dashboard link tersimpan
+  /user/dashboard-links/{id}/publish:
+    patch:
+      tags: [Dashboard Links]
+      summary: Publikasikan dashboard link
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "200":
+          description: Dashboard link dipublikasikan
+  /user/dashboard-links/{id}:
+    delete:
+      tags: [Dashboard Links]
+      summary: Hapus dashboard link
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      responses:
+        "204":
+          description: Dashboard link dihapus
+  /public/dashboard-links/{template}/{slug}:
+    get:
+      tags: [Public Dashboard]
+      summary: Ambil dashboard link publik beserta konfigurasi data source
+      parameters:
+        - name: template
+          in: path
+          required: true
+          schema:
+            type: string
+          example: station2
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: kebun-c-microclimate
+      responses:
+        "200":
+          description: Dashboard publik ditemukan
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ClientId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: cfg-1710000000000
+  responses:
+    BadRequest:
+      description: Request tidak valid
+    Unauthorized:
+      description: Token login tidak valid atau tidak tersedia
+    Conflict:
+      description: Data sudah dipakai
+    NotFound:
+      description: Data tidak ditemukan
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        username:
+          type: string
+        fullName:
+          type: string
+        profilePhoto:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        fullName:
+          type: string
+        username:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+    ProfileUpdateRequest:
+      type: object
+      required: [fullName, username]
+      properties:
+        fullName:
+          type: string
+        username:
+          type: string
+        profilePhoto:
+          type: string
+    EmailUpdateRequest:
+      type: object
+      required: [oldEmail, newEmail]
+      properties:
+        oldEmail:
+          type: string
+          format: email
+        newEmail:
+          type: string
+          format: email
+    PasswordUpdateRequest:
+      type: object
+      required: [newPassword]
+      properties:
+        newPassword:
+          type: string
+          minLength: 8
+    EndpointConfig:
+      type: object
+      required: [name, type, templateId]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [backend, mqtt]
+        templateId:
+          type: string
+          example: station2
+        baseUrl:
+          type: string
+        brokerUrl:
+          type: string
+        endpointMap:
+          type: object
+        topicMap:
+          type: object
+        useSingleEndpoint:
+          type: boolean
+        clientResample:
+          type: string
+        isActive:
+          type: boolean
+    DashboardLink:
+      type: object
+      required: [name, slug, templateId, configId]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        templateId:
+          type: string
+        published:
+          type: boolean
+        configId:
+          type: string

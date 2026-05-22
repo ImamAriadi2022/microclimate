@@ -12,6 +12,17 @@ const toUserResponse = (row) => {
   };
 };
 
+const parseJsonValue = (value, fallback) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "object") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return fallback;
+  }
+};
+
 const toConfigResponse = (row) => {
   if (!row) return null;
 
@@ -22,8 +33,8 @@ const toConfigResponse = (row) => {
     templateId: row.template_id,
     baseUrl: row.base_url || "",
     brokerUrl: row.broker_url || "",
-    endpointMap: row.endpoint_map || {},
-    topicMap: row.topic_map || {},
+    endpointMap: parseJsonValue(row.endpoint_map, {}),
+    topicMap: parseJsonValue(row.topic_map, {}),
     useSingleEndpoint: Boolean(row.use_single_endpoint),
     clientResample: row.client_resample || "none",
     isActive: Boolean(row.is_active),
@@ -46,6 +57,7 @@ const toDashboardLinkResponse = (row) => {
 };
 
 module.exports = {
+  parseJsonValue,
   toUserResponse,
   toConfigResponse,
   toDashboardLinkResponse,

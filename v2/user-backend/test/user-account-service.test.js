@@ -9,11 +9,11 @@ const createFakePool = () => {
     async query(sql, params) {
       if (sql.includes("INSERT INTO mc_users")) {
         const row = {
-          id: "user-1",
-          email: params[0],
-          username: params[1],
-          full_name: params[2],
-          password_hash: params[3],
+          id: params[0],
+          email: params[1],
+          username: params[2],
+          full_name: params[3],
+          password_hash: params[4],
           profile_photo: "",
           created_at: "2026-05-22T00:00:00.000Z",
           updated_at: "2026-05-22T00:00:00.000Z",
@@ -28,6 +28,10 @@ const createFakePool = () => {
 
       if (sql.includes("SELECT * FROM mc_users WHERE email")) {
         return { rows: users.filter((user) => user.email === params[0]) };
+      }
+
+      if (sql.includes("SELECT * FROM mc_users WHERE id")) {
+        return { rows: users.filter((user) => user.id === params[0]) };
       }
 
       throw new Error(`Unexpected query: ${sql}`);

@@ -47,11 +47,13 @@ const toDashboardLinkResponse = (row) => {
 
   return {
     id: row.client_id,
+    username: row.username || "",
     name: row.name,
     slug: row.slug,
     templateId: row.template_id,
     published: Boolean(row.published),
     configId: row.config_client_id || "",
+    uiSettings: parseJsonValue(row.ui_settings, {}),
     updatedAt: row.updated_at,
   };
 };

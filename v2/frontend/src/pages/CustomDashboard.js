@@ -38,9 +38,38 @@ const DEFAULT_UI = {
   downloadButton: true,
 };
 
+const mergeUiSettings = (settings) => ({
+  ...DEFAULT_UI,
+  ...(settings || {}),
+  gaugeItems: {
+    ...DEFAULT_UI.gaugeItems,
+    ...((settings && settings.gaugeItems) || {}),
+  },
+  tableColumns: {
+    ...DEFAULT_UI.tableColumns,
+    ...((settings && settings.tableColumns) || {}),
+  },
+});
+
+const readStoredUiForLink = (link) => {
+  if (!link?.id) return DEFAULT_UI;
+
+  if (link.uiSettings && Object.keys(link.uiSettings).length > 0) {
+    return mergeUiSettings(link.uiSettings);
+  }
+
+  try {
+    const savedUi = localStorage.getItem(UI_KEY);
+    const parsedUi = savedUi ? JSON.parse(savedUi) : {};
+    return mergeUiSettings(parsedUi[link.id]);
+  } catch (_error) {
+    return DEFAULT_UI;
+  }
+};
+
 const CustomDashboard = () => {
   const navigate = useNavigate();
-  const { template, slug } = useParams();
+  const { username = 'user', template, slug } = useParams();
   const templateInfo = useMemo(() => getTemplateById(template), [template]);
   const [linkData, setLinkData] = useState(null);
   const [configData, setConfigData] = useState(null);
@@ -53,48 +82,25 @@ const CustomDashboard = () => {
     const loadLocal = () => {
       const savedLinks = localStorage.getItem(STORAGE_KEY);
       const savedConfigs = localStorage.getItem('mc_v2_user_configs');
-      const savedUi = localStorage.getItem(UI_KEY);
       if (!savedLinks) {
         setIsLoading(false);
         return;
       }
       try {
-      const parsedLinks = JSON.parse(savedLinks);
-      const foundLink = parsedLinks.find(
-        (item) => item.slug === slug && item.templateId === template
-      );
-      setLinkData(foundLink || null);
+        const parsedLinks = JSON.parse(savedLinks);
+        const foundLink = parsedLinks.find(
+          (item) => item.slug === slug && item.templateId === template
+        );
+        setLinkData(foundLink || null);
+        setUiSettings(readStoredUiForLink(foundLink));
 
-      if (savedUi) {
-        try {
-          const parsedUi = JSON.parse(savedUi);
-          const linkUi = foundLink ? parsedUi[foundLink.id] : null;
-          setUiSettings({
-            ...DEFAULT_UI,
-            ...(linkUi || {}),
-            gaugeItems: {
-              ...DEFAULT_UI.gaugeItems,
-              ...((linkUi && linkUi.gaugeItems) || {}),
-            },
-            tableColumns: {
-              ...DEFAULT_UI.tableColumns,
-              ...((linkUi && linkUi.tableColumns) || {}),
-            },
-          });
-        } catch (_error) {
-          setUiSettings(DEFAULT_UI);
+        if (foundLink && foundLink.configId && savedConfigs) {
+          const parsedConfigs = JSON.parse(savedConfigs);
+          const foundConfig = parsedConfigs.find((c) => c.id === foundLink.configId);
+          setConfigData(foundConfig || null);
+        } else {
+          setConfigData(null);
         }
-      } else {
-        setUiSettings(DEFAULT_UI);
-      }
-
-      if (foundLink && foundLink.configId && savedConfigs) {
-        const parsedConfigs = JSON.parse(savedConfigs);
-        const foundConfig = parsedConfigs.find((c) => c.id === foundLink.configId);
-        setConfigData(foundConfig || null);
-      } else {
-        setConfigData(null);
-      }
       } catch (_error) {
         setLinkData(null);
         setConfigData(null);
@@ -104,12 +110,13 @@ const CustomDashboard = () => {
     };
 
     setIsLoading(true);
-    fetchPublicDashboardLink(template, slug)
+    fetchPublicDashboardLink(username, template, slug)
       .then((data) => {
         if (cancelled) return;
-        setLinkData(data.link || null);
+        const remoteLink = data.link || null;
+        setLinkData(remoteLink);
         setConfigData(data.config || null);
-        setUiSettings(DEFAULT_UI);
+        setUiSettings(readStoredUiForLink(remoteLink));
         setIsLoading(false);
       })
       .catch(() => {
@@ -121,7 +128,7 @@ const CustomDashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [slug, template]);
+  }, [slug, template, username]);
 
   const isPublished = Boolean(linkData?.published);
 

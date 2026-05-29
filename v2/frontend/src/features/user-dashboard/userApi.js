@@ -88,11 +88,17 @@ const saveDashboardLink = (payload) =>
 const publishDashboardLink = (id) =>
   apiRequest(`/user/dashboard-links/${encodeURIComponent(id)}/publish`, { method: 'PATCH' });
 
+const saveDashboardLinkUi = (id, uiSettings) =>
+  apiRequest(`/user/dashboard-links/${encodeURIComponent(id)}/ui`, {
+    method: 'PATCH',
+    body: { uiSettings },
+  });
+
 const deleteDashboardLink = (id) =>
   apiRequest(`/user/dashboard-links/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
-const fetchPublicDashboardLink = (template, slug) =>
-  apiRequest(`/public/dashboard-links/${encodeURIComponent(template)}/${encodeURIComponent(slug)}`, {
+const fetchPublicDashboardLink = (username, template, slug) =>
+  apiRequest(`/public/dashboard-links/${encodeURIComponent(username)}/${encodeURIComponent(template)}/${encodeURIComponent(slug)}`, {
     auth: false,
   });
 
@@ -110,6 +116,7 @@ export {
   publishDashboardLink,
   registerAccount,
   saveDashboardLink,
+  saveDashboardLinkUi,
   saveEmail,
   saveEndpointConfig,
   savePassword,

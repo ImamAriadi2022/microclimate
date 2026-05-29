@@ -212,6 +212,27 @@ paths:
       responses:
         "200":
           description: Dashboard link dipublikasikan
+  /user/dashboard-links/{id}/ui:
+    patch:
+      tags: [Dashboard Links]
+      summary: Simpan setting tampilan dashboard link
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ClientId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [uiSettings]
+              properties:
+                uiSettings:
+                  $ref: "#/components/schemas/DashboardUiSettings"
+      responses:
+        "200":
+          description: Setting tampilan dashboard tersimpan
   /user/dashboard-links/{id}:
     delete:
       tags: [Dashboard Links]
@@ -223,10 +244,38 @@ paths:
       responses:
         "204":
           description: Dashboard link dihapus
+  /public/dashboard-links/{username}/{template}/{slug}:
+    get:
+      tags: [Public Dashboard]
+      summary: Ambil dashboard link publik berdasarkan username beserta konfigurasi data source
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+          example: demo-user
+        - name: template
+          in: path
+          required: true
+          schema:
+            type: string
+          example: station2
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          example: kebun-c-microclimate
+      responses:
+        "200":
+          description: Dashboard publik ditemukan
+        "404":
+          $ref: "#/components/responses/NotFound"
   /public/dashboard-links/{template}/{slug}:
     get:
       tags: [Public Dashboard]
-      summary: Ambil dashboard link publik beserta konfigurasi data source
+      summary: Ambil dashboard link publik tanpa username (kompatibilitas lama)
       parameters:
         - name: template
           in: path
@@ -349,6 +398,8 @@ components:
       properties:
         id:
           type: string
+        username:
+          type: string
         name:
           type: string
         type:
@@ -387,3 +438,8 @@ components:
           type: boolean
         configId:
           type: string
+        uiSettings:
+          $ref: "#/components/schemas/DashboardUiSettings"
+    DashboardUiSettings:
+      type: object
+      additionalProperties: true

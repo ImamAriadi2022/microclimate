@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, Col, Form, ListGroup, Row, Stack } from 'react-bootstrap';
+import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Stack } from 'react-bootstrap';
 import { useParams } from 'react-router-dom';
 import { stationTemplates } from '../station-template/stationTemplates';
+import { getAuthToken, listDashboardLinks, saveDashboardLinkUi } from './userApi';
 
 const LINKS_KEY = 'mc_v2_dashboard_links';
 const UI_KEY = 'mc_v2_dashboard_link_ui';
@@ -60,11 +61,25 @@ const TABLE_COLUMNS = [
   { key: 'bmpTemperature', label: 'BMP Temperature (°C)' },
 ];
 
+const readUiSettingsFromLinks = (items) =>
+  items.reduce((acc, item) => {
+    if (item.id && item.uiSettings && Object.keys(item.uiSettings).length > 0) {
+      acc[item.id] = item.uiSettings;
+    }
+    return acc;
+  }, {});
+
 const TemplatePage = () => {
   const { username = 'user' } = useParams();
+  const activeUsername = localStorage.getItem('mc_v2_username') || username || 'user';
   const [links, setLinks] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [uiSettings, setUiSettings] = useState({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [status, setStatus] = useState({
+    type: 'info',
+    message: 'Pilih link, ubah tampilan, lalu tekan Simpan Tampilan.',
+  });
 
   useEffect(() => {
     const savedLinks = localStorage.getItem(LINKS_KEY);
@@ -86,9 +101,28 @@ const TemplatePage = () => {
         setUiSettings({});
       }
     }
+
+    if (getAuthToken()) {
+      listDashboardLinks()
+        .then((data) => {
+          const remoteLinks = data.result || [];
+          const remoteUi = readUiSettingsFromLinks(remoteLinks);
+          setLinks(remoteLinks);
+          setSelectedId(remoteLinks[0]?.id || '');
+          setUiSettings((current) => {
+            const next = { ...current, ...remoteUi };
+            localStorage.setItem(UI_KEY, JSON.stringify(next));
+            return next;
+          });
+          localStorage.setItem(LINKS_KEY, JSON.stringify(remoteLinks));
+        })
+        .catch(() => {
+          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Editor memakai data lokal.' });
+        });
+    }
   }, []);
 
-  const buildPreviewLink = (templateId, slug) => `/${username}/${templateId}/${slug}`;
+  const buildPreviewLink = (templateId, slug) => `/${activeUsername}/${templateId}/${slug}`;
 
   const selectedLink = useMemo(
     () => links.find((item) => item.id === selectedId) || null,
@@ -112,9 +146,10 @@ const TemplatePage = () => {
     };
   }, [selectedLink, uiSettings]);
 
-  const persistUi = (next) => {
+  const updateUi = (next) => {
     setUiSettings(next);
-    localStorage.setItem(UI_KEY, JSON.stringify(next));
+    setHasUnsavedChanges(true);
+    setStatus({ type: 'warning', message: 'Perubahan tampilan belum disimpan.' });
   };
 
   const handleToggle = (key) => {
@@ -126,7 +161,7 @@ const TemplatePage = () => {
         [key]: !activeUi[key],
       },
     };
-    persistUi(next);
+    updateUi(next);
   };
 
   const handleGaugeToggle = (key) => {
@@ -141,7 +176,7 @@ const TemplatePage = () => {
         },
       },
     };
-    persistUi(next);
+    updateUi(next);
   };
 
   const handleTableToggle = (key) => {
@@ -156,13 +191,37 @@ const TemplatePage = () => {
         },
       },
     };
-    persistUi(next);
+    updateUi(next);
   };
 
   const handleReset = () => {
     if (!selectedLink) return;
     const next = { ...uiSettings, [selectedLink.id]: { ...DEFAULT_UI } };
-    persistUi(next);
+    updateUi(next);
+  };
+
+  const handleSaveUi = async () => {
+    if (!selectedLink) return;
+    try {
+      const linkUi = uiSettings[selectedLink.id] || activeUi;
+      if (getAuthToken()) {
+        const data = await saveDashboardLinkUi(selectedLink.id, linkUi);
+        const savedLink = data.result;
+        setLinks((current) => {
+          const next = current.map((item) => (item.id === savedLink.id ? savedLink : item));
+          localStorage.setItem(LINKS_KEY, JSON.stringify(next));
+          return next;
+        });
+      }
+      localStorage.setItem(UI_KEY, JSON.stringify(uiSettings));
+      setHasUnsavedChanges(false);
+      setStatus({
+        type: 'success',
+        message: 'Tampilan dashboard berhasil disimpan. Link dashboard akan memakai setelan terbaru.',
+      });
+    } catch (error) {
+      setStatus({ type: 'danger', message: error.message || 'Tampilan dashboard gagal disimpan.' });
+    }
   };
 
   const hasLinks = links.length > 0;
@@ -172,6 +231,7 @@ const TemplatePage = () => {
         <h2>Template microclimate</h2>
         <p>Kelola dashboard custom: pilih link, edit tampilan, dan lihat preview.</p>
       </div>
+      <Alert variant={status.type}>{status.message}</Alert>
       <Row className="g-4">
         <Col xs={12} lg={4}>
           <Card className="shadow-sm h-100">
@@ -218,9 +278,15 @@ const TemplatePage = () => {
                     Atur elemen dashboard yang ingin ditampilkan.
                   </Card.Text>
                 </div>
-                <Button size="sm" variant="outline-secondary" onClick={handleReset} disabled={!selectedLink}>
-                  Reset ke Default
-                </Button>
+                <Stack direction="horizontal" gap={2} className="flex-wrap">
+                  {hasUnsavedChanges && <Badge bg="warning">Belum disimpan</Badge>}
+                  <Button size="sm" variant="primary" onClick={handleSaveUi} disabled={!selectedLink || !hasUnsavedChanges}>
+                    Simpan Tampilan
+                  </Button>
+                  <Button size="sm" variant="outline-secondary" onClick={handleReset} disabled={!selectedLink}>
+                    Reset ke Default
+                  </Button>
+                </Stack>
               </div>
               <div className="mt-3">
                 {!selectedLink ? (

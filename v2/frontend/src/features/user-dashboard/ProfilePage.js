@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { Alert, Button, Col, Form, Row } from 'react-bootstrap';
 import { FiCamera, FiSave } from 'react-icons/fi';
+import { useNavigate, useParams } from 'react-router-dom';
 import SuccessModal from './SuccessModal';
 import { getAuthToken, saveProfile as saveProfileApi, storeUser } from './userApi';
 
 const ProfilePage = ({ onProfileChange }) => {
+  const navigate = useNavigate();
+  const { username: routeUsername = 'user' } = useParams();
   const fileInputRef = useRef(null);
   const savedName = localStorage.getItem('mc_v2_display_name') || '';
   const savedEmail = localStorage.getItem('mc_v2_login_email') || '';
@@ -77,6 +80,10 @@ const ProfilePage = ({ onProfileChange }) => {
       onProfileChange?.(cleanName);
       setStatus({ type: 'success', message: 'Profil berhasil diperbarui.' });
       setShowSuccess(true);
+
+      if (cleanUsername !== routeUsername) {
+        navigate(`/${cleanUsername}/dashboard/profile`, { replace: true });
+      }
     } catch (error) {
       setStatus({ type: 'danger', message: error.message || 'Profil gagal diperbarui.' });
     }

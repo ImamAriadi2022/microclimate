@@ -22,8 +22,10 @@ router.delete("/user/configs/:id", requireAuth, endpointConfigController.remove)
 router.get("/user/dashboard-links", requireAuth, dashboardLinkController.list);
 router.post("/user/dashboard-links", requireAuth, dashboardLinkController.save);
 router.patch("/user/dashboard-links/:id/publish", requireAuth, dashboardLinkController.publish);
+router.patch("/user/dashboard-links/:id/ui", requireAuth, dashboardLinkController.saveUi);
 router.delete("/user/dashboard-links/:id", requireAuth, dashboardLinkController.remove);
 
+router.get("/public/dashboard-links/:username/:template/:slug", dashboardLinkController.showPublicByUsername);
 router.get("/public/dashboard-links/:template/:slug", dashboardLinkController.showPublic);
 
 module.exports = {

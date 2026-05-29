@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Container } from 'react-bootstrap';
 import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import ChangeEmailPage from '../features/user-dashboard/ChangeEmailPage';
@@ -24,7 +24,17 @@ const UserConfig = () => {
       localStorage.getItem('mc_v2_username') ||
       'user'
   );
-  const basePath = `/${username || 'user'}/dashboard`;
+  const activeUsername = localStorage.getItem('mc_v2_username') || username || 'user';
+  const basePath = `/${activeUsername}/dashboard`;
+
+  useEffect(() => {
+    setDisplayName(
+      localStorage.getItem('mc_v2_display_name') ||
+        localStorage.getItem('mc_v2_username') ||
+        username ||
+        'user'
+    );
+  }, [username]);
 
   const handleToggleSidebar = () => {
     setIsSidebarOpen((prev) => !prev);

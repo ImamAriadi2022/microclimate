@@ -21,6 +21,14 @@ const normalizeSlug = (value) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 
+const normalizeUiSettings = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return JSON.stringify(value);
+};
+
 const validatePayload = (payload) => {
   const name = String(payload.name || "").trim();
   const slug = normalizeSlug(payload.slug);
@@ -44,6 +52,7 @@ const validatePayload = (payload) => {
     templateId,
     configId,
     published: Boolean(payload.published),
+    uiSettings: normalizeUiSettings(payload.uiSettings),
   };
 };
 
@@ -85,17 +94,28 @@ const upsertDashboardLink = async (pool, userId, payload) => {
     const id = crypto.randomUUID();
     const result = await pool.query(
       `INSERT INTO mc_dashboard_links (
-         id, user_id, client_id, name, slug, template_id, published, config_id
+         id, user_id, client_id, name, slug, template_id, published, config_id, ui_settings
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          name = VALUES(name),
          slug = VALUES(slug),
          template_id = VALUES(template_id),
          published = VALUES(published),
          config_id = VALUES(config_id),
+         ui_settings = COALESCE(VALUES(ui_settings), ui_settings),
          updated_at = NOW()`,
-      [id, userId, link.clientId, link.name, link.slug, link.templateId, link.published, configId]
+      [
+        id,
+        userId,
+        link.clientId,
+        link.name,
+        link.slug,
+        link.templateId,
+        link.published,
+        configId,
+        link.uiSettings,
+      ]
     );
 
     const saved = await pool.query(
@@ -114,6 +134,38 @@ const upsertDashboardLink = async (pool, userId, payload) => {
     }
     throw error;
   }
+};
+
+const saveDashboardLinkUi = async (pool, userId, clientId, uiSettings) => {
+  ensurePool(pool);
+
+  const settingsJson = normalizeUiSettings(uiSettings);
+  if (!settingsJson) {
+    throw new ApiError(400, "Setting tampilan dashboard tidak valid.");
+  }
+
+  const result = await pool.query(
+    `UPDATE mc_dashboard_links
+     SET ui_settings = ?,
+         updated_at = NOW()
+     WHERE user_id = ? AND client_id = ?`,
+    [settingsJson, userId, clientId]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new ApiError(404, "Link dashboard tidak ditemukan.");
+  }
+
+  const updated = await pool.query(
+    `SELECT l.*, c.client_id AS config_client_id
+     FROM mc_dashboard_links l
+     LEFT JOIN mc_endpoint_configs c ON c.id = l.config_id
+     WHERE l.user_id = ? AND l.client_id = ?
+     LIMIT 1`,
+    [userId, clientId]
+  );
+
+  return toDashboardLinkResponse(updated.rows[0]);
 };
 
 const publishDashboardLink = async (pool, userId, clientId) => {
@@ -156,12 +208,18 @@ const deleteDashboardLink = async (pool, userId, clientId) => {
   }
 };
 
-const getPublicDashboardLink = async (pool, templateId, slug) => {
+const getPublicDashboardLink = async (pool, username, templateId, slug) => {
   ensurePool(pool);
+
+  const usernameFilter = username
+    ? "u.username = ? AND"
+    : "";
+  const params = username ? [username, templateId, slug] : [templateId, slug];
 
   const result = await pool.query(
     `SELECT
        l.*,
+       u.username,
        c.client_id AS config_client_id,
        c.name AS config_name,
        c.source_type,
@@ -174,10 +232,11 @@ const getPublicDashboardLink = async (pool, templateId, slug) => {
        c.client_resample,
        c.is_active
      FROM mc_dashboard_links l
+     JOIN mc_users u ON u.id = l.user_id
      JOIN mc_endpoint_configs c ON c.id = l.config_id
-     WHERE l.template_id = ? AND l.slug = ?
+     WHERE ${usernameFilter} l.template_id = ? AND l.slug = ?
      LIMIT 1`,
-    [templateId, slug]
+    params
   );
 
   const row = result.rows[0];
@@ -207,6 +266,7 @@ module.exports = {
   listDashboardLinks,
   upsertDashboardLink,
   publishDashboardLink,
+  saveDashboardLinkUi,
   deleteDashboardLink,
   getPublicDashboardLink,
 };

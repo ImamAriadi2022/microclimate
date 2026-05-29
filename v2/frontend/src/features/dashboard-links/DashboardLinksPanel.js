@@ -20,6 +20,7 @@ const slugPattern = /^[a-z0-9-]{3,45}$/;
 
 const DashboardLinksPanel = () => {
   const { username = 'user' } = useParams();
+  const activeUsername = localStorage.getItem('mc_v2_username') || username || 'user';
   const [links, setLinks] = useState([]);
   const [configs, setConfigs] = useState([]);
   const [activeConfigId, setActiveConfigId] = useState('');
@@ -32,7 +33,7 @@ const DashboardLinksPanel = () => {
   const [status, setStatus] = useState({ type: 'info', message: '' });
 
   const buildPreviewLink = (templateId, slug) => {
-    return `/${username}/${templateId}/${slug}`;
+    return `/${activeUsername}/${templateId}/${slug}`;
   };
 
   useEffect(() => {

@@ -47,9 +47,9 @@ const UserSidebar = ({ basePath, isOpen }) => {
           );
         })}
       </nav>
-      <div className="user-sidebar__note">
+      {/* <div className="user-sidebar__note">
         Mode simulasi aktif. Data disimpan lokal di browser.
-      </div>
+      </div> */}
     </aside>
   );
 };

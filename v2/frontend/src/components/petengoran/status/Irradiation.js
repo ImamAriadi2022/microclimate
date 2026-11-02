@@ -1,7 +1,13 @@
 import GaugeChart from "react-gauge-chart";
 
-const IrradiationGauge = ({ irradiation }) => {
-  // Function to determine category based on irradiation
+const clampPercent = (val) => {
+  if (!Number.isFinite(val)) return 0;
+  return Math.min(1, Math.max(0, val));
+};
+
+const IrradiationGauge = ({ irradiation = 0 }) => {
+  const safeVal = typeof irradiation === "number" && !isNaN(irradiation) ? irradiation : 0;
+
   const getCategory = (irr) => {
     if (irr <= 200) return "Low";
     if (irr <= 400) return "Moderate";
@@ -9,16 +15,14 @@ const IrradiationGauge = ({ irradiation }) => {
     return "Very High";
   };
 
-  // Function to determine color based on category
   const getColor = (irr) => {
-    if (irr <= 200) return ["#00FF00", "#e6e6e6"]; // Green
-    if (irr <= 400) return ["#ADFF2F", "#e6e6e6"]; // Light Green
-    if (irr <= 600) return ["#FFD700", "#e6e6e6"]; // Yellow
-    return ["#FF4500", "#e6e6e6"]; // Orange Red
+    if (irr <= 200) return ["#10b981", "#e9eff2"];
+    if (irr <= 400) return ["#84cc16", "#e9eff2"];
+    if (irr <= 600) return ["#f59e0b", "#e9eff2"];
+    return ["#f97316", "#e9eff2"];
   };
 
-  // Calculate percent value for GaugeChart
-  const percentValue = irradiation / 800; // Assume max value is 800 W/m²
+  const percentValue = clampPercent(safeVal / 1000);
 
   return (
     <div className="gauge-wrapper">
@@ -26,18 +30,16 @@ const IrradiationGauge = ({ irradiation }) => {
         id="irradiation-gauge"
         nrOfLevels={100}
         arcsLength={[percentValue, 1 - percentValue]}
-        colors={getColor(irradiation)} // Color based on category
+        colors={getColor(safeVal)}
         percent={percentValue}
         arcPadding={0.01}
         cornerRadius={3}
-        needleColor="#464A4F"
-        needleBaseColor="#464A4F"
-        textColor="#000000"
-        formatTextValue={() => `${irradiation.toFixed(1)} W/m²`}
+        needleColor="#33473f"
+        needleBaseColor="#33473f"
+        textColor="#12241d"
+        formatTextValue={() => `${safeVal.toFixed(1)} W/m²`}
       />
-      <p style={{ textAlign: "center", marginTop: "-10px", fontWeight: "bold" }}>
-        {getCategory(irradiation)}
-      </p>
+      <span className="mc-gauge-category">{getCategory(safeVal)}</span>
     </div>
   );
 };

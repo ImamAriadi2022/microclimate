@@ -1,7 +1,13 @@
 import GaugeChart from "react-gauge-chart";
 
+const clampPercent = (val) => {
+  if (!Number.isFinite(val)) return 0;
+  return Math.min(1, Math.max(0, val));
+};
+
 const HumidityGauge = ({ humidity = 0 }) => {
-  // Function to determine category based on humidity
+  const safeVal = typeof humidity === "number" && !isNaN(humidity) ? humidity : 0;
+
   const getCategory = (hum) => {
     if (hum < 30) return "Very Dry";
     if (hum < 40) return "Dry";
@@ -10,17 +16,15 @@ const HumidityGauge = ({ humidity = 0 }) => {
     return "Very Humid";
   };
 
-  // Function to determine color based on category
   const getColor = (hum) => {
-    if (hum < 30) return ["#FFA500", "#e6e6e6"]; // Orange
-    if (hum < 40) return ["#ADFF2F", "#e6e6e6"]; // Light Green
-    if (hum < 60) return ["#00FF00", "#e6e6e6"]; // Green
-    if (hum < 80) return ["#FFD700", "#e6e6e6"]; // Yellow
-    return ["#FF4500", "#e6e6e6"]; // Red
+    if (hum < 30) return ["#f59e0b", "#e9eff2"];
+    if (hum < 40) return ["#84cc16", "#e9eff2"];
+    if (hum < 60) return ["#10b981", "#e9eff2"];
+    if (hum < 80) return ["#0ea5e9", "#e9eff2"];
+    return ["#3b82f6", "#e9eff2"];
   };
 
-  // Calculate percent value for GaugeChart
-  const percentValue = typeof humidity === "number" && !isNaN(humidity) ? humidity / 100 : 0;
+  const percentValue = clampPercent(safeVal / 100);
 
   return (
     <div className="gauge-wrapper">
@@ -28,24 +32,16 @@ const HumidityGauge = ({ humidity = 0 }) => {
         id="humidity-gauge"
         nrOfLevels={100}
         arcsLength={[percentValue, 1 - percentValue]}
-        colors={getColor(humidity)}
+        colors={getColor(safeVal)}
         percent={percentValue}
         arcPadding={0.01}
         cornerRadius={3}
-        needleColor="#464A4F"
-        needleBaseColor="#464A4F"
-        textColor="#000000"
-        formatTextValue={() =>
-          typeof humidity === "number" && !isNaN(humidity)
-            ? `${humidity.toFixed(1)}%`
-            : "N/A"
-        }
+        needleColor="#33473f"
+        needleBaseColor="#33473f"
+        textColor="#12241d"
+        formatTextValue={() => `${safeVal.toFixed(1)}%`}
       />
-      <p style={{ textAlign: "center", marginTop: "-10px", fontWeight: "bold" }}>
-        {typeof humidity === "number" && !isNaN(humidity)
-          ? getCategory(humidity)
-          : "No Data"}
-      </p>
+      <span className="mc-gauge-category">{getCategory(safeVal)}</span>
     </div>
   );
 };

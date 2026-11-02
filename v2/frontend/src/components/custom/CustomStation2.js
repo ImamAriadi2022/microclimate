@@ -4,6 +4,16 @@ import {
     PETENGORAN_DAILY_STATION2_URL,
     PETENGORAN_RESAMPLE15M_STATION2_URL,
 } from '../../config/apiEndpoints';
+import {
+    STATION_MODES,
+    filterDataByModeRange,
+    findLatestActiveRecord,
+    generateSimulatedRawRecords,
+    hasAnySensorValue,
+    parseFlexibleDate,
+    parseFlexibleTimestamp,
+    toGaugePayload,
+} from '../../utils/stationModeUtils';
 import DataDownloadModal from '../DataDownloadModal';
 import TrendChart, { resampleTimeSeriesWithMeanFill } from "../petengoran/chart";
 import AirPressureGauge from '../petengoran/status/AirPressure';
@@ -14,7 +24,6 @@ import TemperatureGauge from '../petengoran/status/TemperaturGauge';
 import WindDirectionGauge from '../petengoran/status/WindDirection';
 import WindSpeedGauge from '../petengoran/status/WindSpeed';
 
-// Helper
 const windDirectionToEnglish = (dir) => {
   if (!dir) return '';
   const map = {
@@ -57,8 +66,8 @@ const formatUserFriendlyTimestamp = (timestamp) => {
     return timestamp;
   }
   try {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) {
+    const date = parseFlexibleDate(timestamp);
+    if (!date) {
       return timestamp;
     }
     const options = {
@@ -68,16 +77,16 @@ const formatUserFriendlyTimestamp = (timestamp) => {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      timeZone: 'Asia/Jakarta'
+      timeZone: 'Asia/Jakarta',
     };
     return date.toLocaleDateString('id-ID', options);
-  } catch (error) {
+  } catch (_error) {
     return timestamp;
   }
 };
 
 const isValidValue = (val) =>
-  val !== null && val !== undefined && val !== 'error' && val !== 'alat rusak' && !isNaN(Number(val));
+  val !== null && val !== undefined && val !== '' && val !== 'error' && val !== 'alat rusak' && !isNaN(Number(val));
 
 const EMPTY_GAUGE_DATA = {
   humidity: 0,
@@ -91,32 +100,17 @@ const EMPTY_GAUGE_DATA = {
   airpressure: 0,
 };
 
-const hasAllActiveSensorValue = (item) => {
-  if (!item || item.timestamp === 'error' || item.timestamp === 'alat rusak') return false;
-
-  const keys = [
-    'humidity',
-    'temperature',
-    'rainfall',
-    'windspeed',
-    'irradiation',
-    'angle',
-    'bmptemperature',
-    'airpressure',
-  ];
-
-  return keys.every((key) => typeof item[key] === 'number' && !isNaN(item[key]));
-};
-
-
-const parseCustomTimestamp = (ts) => {
-  // Format: "28-07-25 07:00:00" => "2025-07-28T07:00:00"
-  if (!ts || typeof ts !== 'string') return ts;
-  const match = ts.match(/^(\d{2})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
-  if (!match) return ts;
-  const [, dd, mm, yy, h, m, s] = match;
-  return `20${yy}-${mm}-${dd}T${h}:${m}:${s}`;
-};
+const PRIMARY_SENSOR_KEYS = ['humidity', 'temperature', 'rainfall', 'windspeed'];
+const ALL_SENSOR_KEYS = [
+  'humidity',
+  'temperature',
+  'rainfall',
+  'windspeed',
+  'irradiation',
+  'angle',
+  'bmptemperature',
+  'airpressure',
+];
 
 const mapApiData = (item) => {
   if (!item) {
@@ -133,7 +127,7 @@ const mapApiData = (item) => {
       airpressure: 'error',
     };
   }
-  const ts = parseCustomTimestamp(item.timestamp); // <-- tambahkan parsing timestamp
+  const ts = parseFlexibleTimestamp(item.timestamp);
   if (ts === undefined || ts === null || ts === '') {
     return {
       timestamp: 'alat rusak',
@@ -153,83 +147,23 @@ const mapApiData = (item) => {
     humidity: isValidValue(item.humidity) ? Number(item.humidity) : 'alat rusak',
     temperature: isValidValue(item.temperature) ? Number(item.temperature) : 'alat rusak',
     rainfall: isValidValue(item.rainfall) ? Number(item.rainfall) : 'alat rusak',
-    windspeed: isValidValue(item.windSpeed ?? item.windspeed ?? item.wind_speed) ? Number(item.windSpeed ?? item.windspeed ?? item.wind_speed) : 'alat rusak',
-    irradiation: isValidValue(item.pyrano) ? Number(item.pyrano) : (isValidValue(item.irradiation) ? Number(item.irradiation) : 'alat rusak'),
-    windDirection: windDirectionToEnglish(item.direction ?? ''),
+    windspeed: isValidValue(item.windSpeed ?? item.windspeed ?? item.wind_speed)
+      ? Number(item.windSpeed ?? item.windspeed ?? item.wind_speed)
+      : 'alat rusak',
+    irradiation: isValidValue(item.pyrano)
+      ? Number(item.pyrano)
+      : isValidValue(item.irradiation)
+        ? Number(item.irradiation)
+        : 'alat rusak',
+    windDirection: windDirectionToEnglish(item.direction ?? item.windDirection ?? ''),
     angle: isValidValue(item.angle) ? Number(item.angle) : 'alat rusak',
-    bmptemperature: isValidValue(item.bmpTemperature ?? item.bmptemperature) ? Number(item.bmpTemperature ?? item.bmptemperature) : 'alat rusak',
+    bmptemperature: isValidValue(item.bmpTemperature ?? item.bmptemperature)
+      ? Number(item.bmpTemperature ?? item.bmptemperature)
+      : 'alat rusak',
     airpressure: isValidValue(item.AirPressure ?? item.airPressure ?? item.airpressure)
       ? Number(item.AirPressure ?? item.airPressure ?? item.airpressure)
       : 'alat rusak',
   };
-};
-
-
-function filterByRange(data, filter, startTimestamp, endTimestamp) {
-  if (!Array.isArray(data) || data.length === 0) return [];
-
-  const startDate = startTimestamp ? new Date(startTimestamp) : null;
-  const endDate = endTimestamp ? new Date(endTimestamp) : null;
-  const hasStart = startDate && !Number.isNaN(startDate.getTime());
-  const hasEnd = endDate && !Number.isNaN(endDate.getTime());
-
-  if (hasStart || hasEnd) {
-    return data.filter((d) => {
-      const t = new Date(d.timestamp);
-      if (Number.isNaN(t.getTime())) return false;
-      if (hasStart && t < startDate) return false;
-      if (hasEnd && t > endDate) return false;
-      return true;
-    });
-  }
-
-  const now = new Date();
-  let minDate;
-  if (filter === '1d') minDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  else if (filter === '7d') minDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  else if (filter === '1m') minDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  else minDate = null;
-
-  return minDate
-    ? data.filter(d => {
-        const t = new Date(d.timestamp);
-        return t >= minDate && t <= now;
-      })
-    : data;
-}
-
-const generateMockData = (count, startDateTime, endDateTime) => {
-  const data = [];
-  const now = new Date();
-  let current = startDateTime ? new Date(startDateTime).getTime() : now.getTime() - (count * 15 * 60 * 1000);
-  const step = 15 * 60 * 1000;
-
-  const directions = ['Utara', 'Timur Laut', 'Timur', 'Tenggara', 'Selatan', 'Barat Daya', 'Barat', 'Barat Laut'];
-
-  for (let i = 0; i < count; i++) {
-    const d = new Date(current);
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yy = String(d.getFullYear()).slice(2);
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    const s = String(d.getSeconds()).padStart(2, '0');
-    
-    data.push({
-      timestamp: `${dd}-${mm}-${yy} ${h}:${m}:${s}`,
-      humidity: (60 + Math.random() * 30).toFixed(1),
-      temperature: (25 + Math.random() * 10).toFixed(1),
-      rainfall: (Math.random() > 0.8 ? Math.random() * 5 : 0).toFixed(1),
-      windSpeed: (Math.random() * 15).toFixed(1),
-      pyrano: (Math.random() * 1000).toFixed(1),
-      direction: directions[Math.floor(Math.random() * directions.length)],
-      angle: Math.floor(Math.random() * 360),
-      bmpTemperature: (24 + Math.random() * 10).toFixed(1),
-      airPressure: (1000 + Math.random() * 20).toFixed(1),
-    });
-    current += step;
-  }
-  return data.reverse();
 };
 
 const DEFAULT_UI = {
@@ -277,14 +211,13 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     },
   };
   const [filter, setFilter] = useState('1d');
+  const [activeMode, setActiveMode] = useState(STATION_MODES.REALTIME);
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [tableData, setTableData] = useState([]);
   const [loading] = useState(false);
   const [error, setError] = useState(null);
   const [lastActiveTimestamp, setLastActiveTimestamp] = useState(null);
-  const [gaugeMode, setGaugeMode] = useState('realtime');
-  const [dataSourceMode, setDataSourceMode] = useState('realtime');
   const [lastActiveGaugeData, setLastActiveGaugeData] = useState(null);
   const [realtimeGaugeData, setRealtimeGaugeData] = useState(EMPTY_GAUGE_DATA);
   const [gaugeData, setGaugeData] = useState(EMPTY_GAUGE_DATA);
@@ -292,8 +225,8 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
   const [endDateTime, setEndDateTime] = useState('');
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const latestRequestRef = useRef(0);
+  const cachedRealDataRef = useRef([]);
 
-  // Get API URL based on filter
   const joinEndpointUrl = (baseUrl, customPath, fallbackPath) => {
     const cleanBase = String(baseUrl || '').trim().replace(/\/$/, '');
     const rawPath = String(customPath || fallbackPath || '').trim();
@@ -305,7 +238,6 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     if (customConfig && customConfig.type === 'backend' && customConfig.baseUrl) {
       const map = customConfig.endpointMap || {};
 
-      // If single endpoint mode is enabled, always hit topic5History
       if (customConfig.useSingleEndpoint) {
         return joinEndpointUrl(
           customConfig.baseUrl,
@@ -332,9 +264,8 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
 
     switch (filterType) {
       case '1d':
-        return PETENGORAN_DAILY_STATION2_URL;
       case '7d':
-        return PETENGORAN_DAILY_STATION2_URL; // Use daily for 7 days and filter client-side
+        return PETENGORAN_DAILY_STATION2_URL;
       case '1m':
         return PETENGORAN_RESAMPLE15M_STATION2_URL;
       default:
@@ -362,7 +293,6 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     return parsed.toString();
   };
 
-
   const fetchJsonOrThrow = async (url) => {
     const response = await fetch(url);
     if (!response.ok) {
@@ -385,9 +315,9 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
   };
 
   const fetchPagedResult = async (baseUrl, sourceMode, filterType, startTime = null, endTime = null) => {
-    const pageLimit = sourceMode === 'simulation' ? 200 : 500;
+    const pageLimit = sourceMode === STATION_MODES.SIMULATION ? 200 : 500;
     const targetCount = getTargetRecordCount(filterType);
-    const maxPages = sourceMode === 'simulation' ? 8 : 12;
+    const maxPages = sourceMode === STATION_MODES.SIMULATION ? 8 : 12;
     const rows = [];
 
     for (let page = 0; page < maxPages && rows.length < targetCount; page += 1) {
@@ -412,9 +342,8 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     return rows;
   };
 
-  // Fetch data dari API berdasarkan filter
   const fetchData = async (
-    sourceMode = 'realtime',
+    targetMode = activeMode,
     filterType = filter,
     selectedStartTime = startDateTime,
     selectedEndTime = endDateTime
@@ -422,25 +351,30 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     const requestId = latestRequestRef.current + 1;
     latestRequestRef.current = requestId;
 
-    // Hapus setLoading(true) agar tidak ada loading indicator visual
     setError(null);
+    const isSimulation = targetMode === STATION_MODES.SIMULATION;
+
     try {
       let rawRows = [];
 
-      const startTime = sourceMode === 'realtime' && selectedStartTime
+      const startTime = !isSimulation && selectedStartTime
         ? new Date(selectedStartTime).toISOString()
         : null;
-      const endTime = sourceMode === 'realtime' && selectedEndTime
+      const endTime = !isSimulation && selectedEndTime
         ? new Date(selectedEndTime).toISOString()
         : null;
 
-      if (sourceMode === 'simulation') {
-        const count = getTargetRecordCount(filterType);
-        rawRows = generateMockData(count, selectedStartTime, selectedEndTime);
+      if (isSimulation) {
+        rawRows = generateSimulatedRawRecords({
+          filter: filterType,
+          startDateTime: selectedStartTime,
+          endDateTime: selectedEndTime,
+          stationSeed: 2,
+        });
       } else {
         const url = getApiUrl(filterType);
         if (!url) throw new Error(`No API URL configured for filter: ${filterType}`);
-        rawRows = await fetchPagedResult(url, sourceMode, filterType, startTime, endTime);
+        rawRows = await fetchPagedResult(url, STATION_MODES.REALTIME, filterType, startTime, endTime);
       }
 
       if (requestId !== latestRequestRef.current) {
@@ -450,60 +384,89 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
       const mapped = rawRows
         .map(mapApiData)
         .filter((row) => {
-          const rowTime = new Date(row.timestamp);
-          if (Number.isNaN(rowTime.getTime())) return false;
+          const rowTime = parseFlexibleDate(row.timestamp);
+          if (!rowTime) return false;
           if (startTime && rowTime < new Date(startTime)) return false;
           if (endTime && rowTime > new Date(endTime)) return false;
           return true;
-        });
+        })
+        .sort((a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp));
 
-      const latestActive = mapped.find(hasAllActiveSensorValue);
-      setLastActiveTimestamp(latestActive ? latestActive.timestamp : null);
-      setLastActiveGaugeData(latestActive ? latestActive : null);
-      setDataSourceMode(sourceMode);
-
-      mapped.sort((a, b) => {
-        if (a.timestamp === 'error' || a.timestamp === 'alat rusak' || b.timestamp === 'error' || b.timestamp === 'alat rusak') {
-          return (a.timestamp === 'error' || a.timestamp === 'alat rusak') ? 1 : -1;
+      if (!isSimulation) {
+        cachedRealDataRef.current = mapped;
+        const latestActive = findLatestActiveRecord(mapped, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+        if (latestActive || (!selectedStartTime && !selectedEndTime)) {
+          setLastActiveTimestamp(latestActive ? latestActive.timestamp : null);
+          setLastActiveGaugeData(
+            latestActive ? toGaugePayload(latestActive, EMPTY_GAUGE_DATA) : null
+          );
         }
-        const timeA = new Date(a.timestamp);
-        const timeB = new Date(b.timestamp);
-        return timeB - timeA;
-      });
+      }
+
       setAllData(mapped);
     } catch (err) {
       if (requestId !== latestRequestRef.current) {
         return;
       }
 
-      setDataSourceMode(sourceMode);
+      if (isSimulation) {
+        const fallbackSim = generateSimulatedRawRecords({
+          filter: filterType,
+          startDateTime: selectedStartTime,
+          endDateTime: selectedEndTime,
+          stationSeed: 2,
+        }).map(mapApiData);
+        setAllData(fallbackSim);
+        return;
+      }
+
       setError(`Failed to fetch data: ${err.message}`);
       setAllData([]);
-      setLastActiveTimestamp(null);
-      setLastActiveGaugeData(null);
+      if (!selectedStartTime && !selectedEndTime) {
+        setLastActiveTimestamp(null);
+        setLastActiveGaugeData(null);
+      }
     }
-    // Hapus finally block setLoading(false)
   };
 
   useEffect(() => {
-    fetchData(dataSourceMode, filter, startDateTime, endDateTime);
+    fetchData(activeMode, filter, startDateTime, endDateTime);
     // eslint-disable-next-line
-  }, [filter, startDateTime, endDateTime]);
+  }, [filter, startDateTime, endDateTime, customConfig]);
 
-  const handleSimulationToggle = () => {
-    if (dataSourceMode === 'simulation') {
-      fetchData('realtime', filter, startDateTime, endDateTime);
+  const handleModeChange = (nextMode) => {
+    if (nextMode === activeMode && nextMode !== STATION_MODES.SIMULATION) {
+      return;
+    }
+    const resolvedMode =
+      nextMode === STATION_MODES.SIMULATION && activeMode === STATION_MODES.SIMULATION
+        ? STATION_MODES.REALTIME
+        : nextMode;
+
+    setActiveMode(resolvedMode);
+
+    if (
+      resolvedMode !== STATION_MODES.SIMULATION &&
+      activeMode !== STATION_MODES.SIMULATION &&
+      cachedRealDataRef.current.length > 0
+    ) {
+      setError(null);
+      setAllData(cachedRealDataRef.current);
       return;
     }
 
-    fetchData('simulation', filter, startDateTime, endDateTime);
+    fetchData(resolvedMode, filter, startDateTime, endDateTime);
   };
 
-
   useEffect(() => {
-    // Filter data sesuai range
-    const filtered = filterByRange(allData, filter, startDateTime, endDateTime);
-    
+    const filtered = filterDataByModeRange(allData, {
+      filter,
+      startDateTime,
+      endDateTime,
+      mode: activeMode,
+      lastActiveTimestamp,
+    });
+
     const fields = [
       'humidity',
       'temperature',
@@ -516,47 +479,56 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
       'airpressure',
     ];
 
-    // Apply client-side resampling for chart if configured
     let chartData = filtered;
     if (customConfig && customConfig.clientResample && customConfig.clientResample !== 'none') {
       const intervalMinutes = parseInt(customConfig.clientResample, 10) || 15;
       chartData = resampleTimeSeriesWithMeanFill(filtered, intervalMinutes, fields);
     }
     setFilteredData(chartData);
-  
-    const resampledTableData = resampleTimeSeriesWithMeanFill(filtered, 15, fields);
 
-    const sortedResampled = [...resampledTableData].sort ((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const resampledTableData = resampleTimeSeriesWithMeanFill(filtered, 15, fields);
+    const sortedResampled = [...resampledTableData].sort(
+      (a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp)
+    );
     setTableData(sortedResampled);
 
-    // Mode realtime hanya pakai data yang semua sensornya valid (alat aktif penuh)
-    const latestFullyActiveRealtime = sortedResampled.find(hasAllActiveSensorValue);
-    if (latestFullyActiveRealtime) {
-      setRealtimeGaugeData({
-        humidity: latestFullyActiveRealtime.humidity,
-        temperature: latestFullyActiveRealtime.temperature,
-        rainfall: latestFullyActiveRealtime.rainfall,
-        windspeed: latestFullyActiveRealtime.windspeed,
-        irradiation: latestFullyActiveRealtime.irradiation,
-        windDirection: latestFullyActiveRealtime.windDirection,
-        angle: latestFullyActiveRealtime.angle,
-        bmptemperature: latestFullyActiveRealtime.bmptemperature,
-        airpressure: latestFullyActiveRealtime.airpressure,
-      });
-    } else {
-      setRealtimeGaugeData(EMPTY_GAUGE_DATA);
-    }
-  }, [allData, filter, startDateTime, endDateTime, customConfig]);
+    const latestWindowRecord =
+      findLatestActiveRecord(sortedResampled, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS) ||
+      findLatestActiveRecord(filtered, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+
+    const windowGauge = latestWindowRecord
+      ? toGaugePayload(latestWindowRecord, EMPTY_GAUGE_DATA)
+      : EMPTY_GAUGE_DATA;
+
+    setRealtimeGaugeData(windowGauge);
+  }, [allData, filter, startDateTime, endDateTime, customConfig, activeMode, lastActiveTimestamp]);
 
   useEffect(() => {
-    if (gaugeMode === 'last-active' && lastActiveGaugeData) {
-      setGaugeData(lastActiveGaugeData);
+    if (activeMode === STATION_MODES.LAST_ACTIVE) {
+      if ((startDateTime || endDateTime) && hasAnySensorValue(realtimeGaugeData, ALL_SENSOR_KEYS)) {
+        setGaugeData(realtimeGaugeData);
+        return;
+      }
+      setGaugeData(lastActiveGaugeData || realtimeGaugeData);
       return;
     }
 
     setGaugeData(realtimeGaugeData);
-  }, [gaugeMode, lastActiveGaugeData, realtimeGaugeData]);
+  }, [activeMode, lastActiveGaugeData, realtimeGaugeData, startDateTime, endDateTime]);
 
+  const modeLabel =
+    activeMode === STATION_MODES.SIMULATION
+      ? 'Simulasi'
+      : activeMode === STATION_MODES.LAST_ACTIVE
+        ? 'Terakhir Aktif'
+        : 'Realtime';
+
+  const modeBadgeMod =
+    activeMode === STATION_MODES.SIMULATION
+      ? 'mc-mode-badge--simulation'
+      : activeMode === STATION_MODES.LAST_ACTIVE
+        ? 'mc-mode-badge--last-active'
+        : 'mc-mode-badge--realtime';
 
   return (
     <section className="mc-custom-station">
@@ -583,8 +555,8 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             </div>
             <div className="mc-status-chip">
               <span className="text-muted">Mode sumber:</span>{' '}
-              <span className={`badge ${dataSourceMode === 'simulation' ? 'bg-warning text-dark' : 'bg-success'}`}>
-                {dataSourceMode === 'simulation' ? 'Simulasi' : 'Realtime'}
+              <span className={`mc-mode-badge ${modeBadgeMod}`}>
+                {modeLabel}
               </span>
             </div>
           </div>
@@ -597,38 +569,34 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
         )}
 
         <div className="mc-station-toolbar mb-4">
-          <div className="d-flex flex-wrap gap-2 align-items-center">
-            {activeUi.gauges && (
-              <>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${gaugeMode === 'realtime' ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => setGaugeMode('realtime')}
-                >
-                  Mode Realtime
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-sm ${gaugeMode === 'last-active' ? 'btn-primary' : 'btn-outline-primary'}`}
-                  onClick={() => setGaugeMode('last-active')}
-                  disabled={!lastActiveGaugeData}
-                >
-                  Mode Terakhir Aktif
-                </button>
-              </>
-            )}
+          <div className="mc-mode-group" role="group" aria-label="Pilih mode tampilan">
             <button
               type="button"
-              className={`btn btn-sm ${dataSourceMode === 'simulation' ? 'btn-warning' : 'btn-outline-secondary'}`}
-              onClick={handleSimulationToggle}
+              className={`btn btn-sm ${activeMode === STATION_MODES.REALTIME ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handleModeChange(STATION_MODES.REALTIME)}
             >
-              Simulasi {dataSourceMode === 'simulation' ? 'ON' : 'OFF'}
+              Mode Realtime
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.LAST_ACTIVE ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handleModeChange(STATION_MODES.LAST_ACTIVE)}
+              disabled={!lastActiveGaugeData}
+            >
+              Mode Terakhir Aktif
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.SIMULATION ? 'btn-warning' : 'btn-outline-warning'}`}
+              onClick={() => handleModeChange(STATION_MODES.SIMULATION)}
+            >
+              Mode Simulasi {activeMode === STATION_MODES.SIMULATION ? 'ON' : 'OFF'}
             </button>
           </div>
           {activeUi.downloadButton && (
             <button
               type="button"
-              className="btn btn-sm btn-primary"
+              className="btn btn-sm btn-primary fw-semibold px-3"
               onClick={() => setShowDownloadModal(true)}
             >
               Download Data
@@ -641,8 +609,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.humidity && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Humidity</h5>
+                    <span className="mc-sensor-card__unit-tag">%</span>
+                  </div>
                   <HumidityGauge humidity={typeof gaugeData.humidity === 'number' ? gaugeData.humidity : 0} />
-                  <h5 className="mc-sensor-card__title">Humidity</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.humidity === 'number' ? `${gaugeData.humidity}%` : gaugeData.humidity}</p>
                 </div>
               </Col>
@@ -650,8 +621,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.temperature && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Temperature</h5>
+                    <span className="mc-sensor-card__unit-tag">°C</span>
+                  </div>
                   <TemperatureGauge temperature={typeof gaugeData.temperature === 'number' ? gaugeData.temperature : 0} />
-                  <h5 className="mc-sensor-card__title">Temperature</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.temperature === 'number' ? `${gaugeData.temperature}°C` : gaugeData.temperature}</p>
                 </div>
               </Col>
@@ -659,8 +633,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.rainfall && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Rainfall</h5>
+                    <span className="mc-sensor-card__unit-tag">mm</span>
+                  </div>
                   <RainfallGauge rainfall={typeof gaugeData.rainfall === 'number' ? gaugeData.rainfall : 0} />
-                  <h5 className="mc-sensor-card__title">Rainfall</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.rainfall === 'number' ? `${gaugeData.rainfall} mm` : gaugeData.rainfall}</p>
                 </div>
               </Col>
@@ -668,8 +645,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.windspeed && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Wind Speed</h5>
+                    <span className="mc-sensor-card__unit-tag">km/h</span>
+                  </div>
                   <WindSpeedGauge windspeed={typeof gaugeData.windspeed === 'number' ? gaugeData.windspeed : 0} />
-                  <h5 className="mc-sensor-card__title">Wind Speed</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.windspeed === 'number' ? `${gaugeData.windspeed} km/h` : gaugeData.windspeed}</p>
                 </div>
               </Col>
@@ -677,8 +657,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.irradiation && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Irradiation</h5>
+                    <span className="mc-sensor-card__unit-tag">W/m²</span>
+                  </div>
                   <IrradiationGauge irradiation={typeof gaugeData.irradiation === 'number' ? gaugeData.irradiation : 0} />
-                  <h5 className="mc-sensor-card__title">Irradiation</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.irradiation === 'number' ? `${gaugeData.irradiation} W/m²` : gaugeData.irradiation}</p>
                 </div>
               </Col>
@@ -686,10 +669,13 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.windDirection && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Wind Direction</h5>
+                    <span className="mc-sensor-card__unit-tag">°</span>
+                  </div>
                   <WindDirectionGauge windDirection={gaugeData.angle} />
-                  <h5 className="mc-sensor-card__title">Wind Direction</h5>
                   <p className="mc-sensor-card__value">
-                    {gaugeData.windDirection 
+                    {gaugeData.windDirection
                       ? `${gaugeData.windDirection} (${gaugeData.angle}°)`
                       : gaugeData.angle}
                   </p>
@@ -699,8 +685,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.airPressure && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">Air Pressure</h5>
+                    <span className="mc-sensor-card__unit-tag">hPa</span>
+                  </div>
                   <AirPressureGauge airPressure={typeof gaugeData.airpressure === 'number' ? gaugeData.airpressure : 0} />
-                  <h5 className="mc-sensor-card__title">Air Pressure</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.airpressure === 'number' ? `${gaugeData.airpressure} hPa` : gaugeData.airpressure}</p>
                 </div>
               </Col>
@@ -708,8 +697,11 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
             {activeUi.gaugeItems.bmpTemperature && (
               <Col xs={12} sm={6} md={3}>
                 <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">BMP Temperature</h5>
+                    <span className="mc-sensor-card__unit-tag">°C</span>
+                  </div>
                   <TemperatureGauge temperature={typeof gaugeData.bmptemperature === 'number' ? gaugeData.bmptemperature : 0} />
-                  <h5 className="mc-sensor-card__title">BMP Temperature</h5>
                   <p className="mc-sensor-card__value">{typeof gaugeData.bmptemperature === 'number' ? `${gaugeData.bmptemperature}°C` : gaugeData.bmptemperature}</p>
                 </div>
               </Col>
@@ -775,7 +767,14 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
         )}
         {activeUi.chart && (
           <div className="mc-section-card mb-4">
-            <h4 className="mc-section-card__title mb-3">Grafik Tren Parameter</h4>
+            <div className="mc-section-card__header">
+              <div>
+                <h4 className="mc-section-card__title">Grafik Tren Parameter</h4>
+                <p className="mc-section-card__subtitle">
+                  Tren perubahan parameter lingkungan berdasarkan rentang waktu terpilih
+                </p>
+              </div>
+            </div>
             <TrendChart
               data={filteredData}
               fields={[
@@ -794,10 +793,17 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
 
         {activeUi.table && (
           <div className="mc-section-card mb-4">
-            <h4 className="mc-section-card__title mb-3">Riwayat Pembacaan Sensor</h4>
+            <div className="mc-section-card__header">
+              <div>
+                <h4 className="mc-section-card__title">Riwayat Pembacaan Sensor</h4>
+                <p className="mc-section-card__subtitle">
+                  10 rekaman pembacaan terbaru pada rentang waktu yang dipilih
+                </p>
+              </div>
+            </div>
             <div style={{ overflowX: 'auto' }}>
               {tableData.length > 0 ? (
-                <Table striped bordered hover variant="light" className="mb-0 align-middle">
+                <Table hover responsive className="mc-data-table mb-0 align-middle">
                   <thead>
                     <tr>
                       {activeUi.tableColumns.status && <th>Status</th>}
@@ -815,16 +821,12 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
                   <tbody>
                     {tableData.slice(0, 10).map((item, index) => {
                       const isLatest = index === 0;
-                      const isUsedInGauge = (
-                        item.humidity === gaugeData.humidity &&
-                        item.temperature === gaugeData.temperature &&
-                        item.rainfall === gaugeData.rainfall &&
-                        item.windspeed === gaugeData.windspeed &&
-                        item.irradiation === gaugeData.irradiation &&
-                        item.angle === gaugeData.angle &&
-                        item.airpressure === gaugeData.airpressure &&
-                        item.bmptemperature === gaugeData.bmptemperature
-                      );
+                      const isUsedInGauge =
+                        (item.humidity === gaugeData.humidity &&
+                          item.temperature === gaugeData.temperature &&
+                          item.rainfall === gaugeData.rainfall &&
+                          item.windspeed === gaugeData.windspeed) ||
+                        (isLatest && hasAnySensorValue(gaugeData, ALL_SENSOR_KEYS));
                       return (
                         <tr key={index}>
                           {activeUi.tableColumns.status && (
@@ -838,28 +840,27 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
                           {activeUi.tableColumns.timestamp && (
                             <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
                           )}
-                          {activeUi.tableColumns.humidity && <td>{item.humidity}</td>}
-                          {activeUi.tableColumns.temperature && <td>{item.temperature}</td>}
-                          {activeUi.tableColumns.rainfall && <td>{item.rainfall}</td>}
-                          {activeUi.tableColumns.windspeed && <td>{item.windspeed}</td>}
-                          {activeUi.tableColumns.irradiation && <td>{item.irradiation}</td>}
-                          {activeUi.tableColumns.windDirection && <td>{item.windDirection}</td>}
-                          {activeUi.tableColumns.airPressure && <td>{item.airpressure}</td>}
-                          {activeUi.tableColumns.bmpTemperature && <td>{item.bmptemperature}</td>}
+                          {activeUi.tableColumns.humidity && <td>{item.humidity ?? '-'}</td>}
+                          {activeUi.tableColumns.temperature && <td>{item.temperature ?? '-'}</td>}
+                          {activeUi.tableColumns.rainfall && <td>{item.rainfall ?? '-'}</td>}
+                          {activeUi.tableColumns.windspeed && <td>{item.windspeed ?? '-'}</td>}
+                          {activeUi.tableColumns.irradiation && <td>{item.irradiation ?? '-'}</td>}
+                          {activeUi.tableColumns.windDirection && <td>{item.windDirection || '-'}</td>}
+                          {activeUi.tableColumns.airPressure && <td>{item.airpressure ?? '-'}</td>}
+                          {activeUi.tableColumns.bmpTemperature && <td>{item.bmptemperature ?? '-'}</td>}
                         </tr>
                       );
                     })}
                   </tbody>
                 </Table>
               ) : (
-                <p className="text-center text-muted my-3">
+                <div className="mc-empty-state">
                   {loading ? 'Memuat data...' : 'Belum ada data untuk rentang waktu yang dipilih.'}
-                </p>
+                </div>
               )}
             </div>
           </div>
         )}
-
       </Container>
       {activeUi.downloadButton && (
         <DataDownloadModal
@@ -868,8 +869,15 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
           data={filteredData}
           stationName={customTitle || 'Station 2'}
           availableFields={[
-            'humidity', 'temperature', 'rainfall', 'windspeed',
-            'irradiation', 'windDirection', 'angle', 'bmptemperature', 'airpressure'
+            'humidity',
+            'temperature',
+            'rainfall',
+            'windspeed',
+            'irradiation',
+            'windDirection',
+            'angle',
+            'bmptemperature',
+            'airpressure',
           ]}
         />
       )}

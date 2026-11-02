@@ -1,7 +1,13 @@
 import GaugeChart from "react-gauge-chart";
 
-const WindspeedGauge = ({ windspeed }) => {
-  // Function to determine category based on wind speed
+const clampPercent = (val) => {
+  if (!Number.isFinite(val)) return 0;
+  return Math.min(1, Math.max(0, val));
+};
+
+const WindspeedGauge = ({ windspeed = 0 }) => {
+  const safeVal = typeof windspeed === "number" && !isNaN(windspeed) ? windspeed : 0;
+
   const getCategory = (speed) => {
     if (speed < 1) return "Calm";
     if (speed <= 5) return "Light Air";
@@ -18,14 +24,13 @@ const WindspeedGauge = ({ windspeed }) => {
     return "Hurricane";
   };
 
-  // Function to determine color based on wind speed
   const getColor = (speed) => {
-    const hue = 120 - (speed / 120) * 120; // 120° (Green) to 0° (Red)
-    return `hsl(${hue}, 100%, 50%)`;
+    const ratio = clampPercent(speed / 120);
+    const hue = Math.round(150 - ratio * 150);
+    return `hsl(${hue}, 82%, 44%)`;
   };
 
-  // Calculate percent value for GaugeChart
-  const percentValue = windspeed / 120; // Assume max value is 120 km/h
+  const percentValue = clampPercent(safeVal / 120);
 
   return (
     <div className="gauge-wrapper">
@@ -33,18 +38,16 @@ const WindspeedGauge = ({ windspeed }) => {
         id="windspeed-gauge"
         nrOfLevels={100}
         arcsLength={[percentValue, 1 - percentValue]}
-        colors={[getColor(windspeed), "#e6e6e6"]} // Color based on wind speed
+        colors={[getColor(safeVal), "#e9eff2"]}
         percent={percentValue}
         arcPadding={0.01}
         cornerRadius={3}
-        needleColor="#464A4F"
-        needleBaseColor="#464A4F"
-        textColor="#000000"
-        formatTextValue={() => `${windspeed.toFixed(1)} km/h`}
+        needleColor="#33473f"
+        needleBaseColor="#33473f"
+        textColor="#12241d"
+        formatTextValue={() => `${safeVal.toFixed(1)} km/h`}
       />
-      <p style={{ textAlign: "center", marginTop: "-10px", fontWeight: "bold" }}>
-        {getCategory(windspeed)}
-      </p>
+      <span className="mc-gauge-category">{getCategory(safeVal)}</span>
     </div>
   );
 };

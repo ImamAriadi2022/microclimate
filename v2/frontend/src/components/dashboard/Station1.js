@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, ButtonGroup, Col, Container, Row, Table } from 'react-bootstrap';
-
 import { PETENGORAN_TOPIC4_URL } from '../../config/apiEndpoints';
+import {
+  STATION_MODES,
+  filterDataByModeRange,
+  findLatestActiveRecord,
+  generateSimulatedRawRecords,
+  parseFlexibleDate,
+  parseFlexibleTimestamp,
+  toGaugePayload,
+} from '../../utils/stationModeUtils';
 import TrendChart from "./chart";
 
-// Komponen Gauge
 import AirPressureGauge from './status/AirPressure';
 import HumidityGauge from './status/HumidityGauge';
 import RainfallGauge from './status/Rainfall';
@@ -13,7 +20,6 @@ import WaterTemperatureGauge from './status/WaterTemperature';
 import WindDirectionGauge from './status/WindDirection';
 import WindSpeedGauge from './status/WindSpeed';
 
-// Daftar field yang ingin ditampilkan (dinamis, urutkan sesuai kebutuhan frontend)
 const FIELD_CONFIG = [
   { key: 'humidity', label: 'Humidity', unit: '%', gauge: HumidityGauge },
   { key: 'temperature', label: 'Temperature', unit: '°C', gauge: TemperatureGauge },
@@ -24,298 +30,372 @@ const FIELD_CONFIG = [
   { key: 'waterTemperature', label: 'Water Temperature', unit: '°C', gauge: WaterTemperatureGauge },
 ];
 
-// API endpoint dari .env
-const API_URL = PETENGORAN_TOPIC4_URL;
+const EMPTY_GAUGE_DATA = {
+  humidity: 0,
+  temperature: 0,
+  airPressure: 0,
+  windspeed: 0,
+  rainfall: 0,
+  windDirection: 0,
+  waterTemperature: 0,
+};
 
-// Helper untuk mapping key dari API ke key frontend
+const PRIMARY_SENSOR_KEYS = ['humidity', 'temperature', 'rainfall', 'windspeed'];
+const ALL_SENSOR_KEYS = FIELD_CONFIG.map((f) => f.key);
+
+const API_URL = PETENGORAN_TOPIC4_URL;
+const LOCAL_STORAGE_KEY = "station1_data";
+
+const isValidValue = (val) =>
+  val !== null && val !== undefined && val !== '' && val !== 'error' && val !== 'alat rusak' && !isNaN(Number(val));
+
 function mapApiData(apiItem) {
+  if (!apiItem) return null;
+  const ts = parseFlexibleTimestamp(apiItem.timestamp);
+  if (!ts) return null;
   return {
-    timestamp: apiItem.timestamp,
-    humidity: apiItem.humidity,
-    temperature: apiItem.temperature,
-    airPressure: apiItem.AirPressure,
-    windspeed: apiItem.windSpeed,
-    rainfall: apiItem.rainfall,
-    windDirection: apiItem.angle,
-    waterTemperature: apiItem.suhuAir,
-    // tambahkan mapping lain jika perlu
+    timestamp: ts,
+    humidity: isValidValue(apiItem.humidity) ? Number(apiItem.humidity) : null,
+    temperature: isValidValue(apiItem.temperature) ? Number(apiItem.temperature) : null,
+    airPressure: isValidValue(apiItem.AirPressure ?? apiItem.airPressure)
+      ? Number(apiItem.AirPressure ?? apiItem.airPressure)
+      : null,
+    windspeed: isValidValue(apiItem.windSpeed ?? apiItem.windspeed)
+      ? Number(apiItem.windSpeed ?? apiItem.windspeed)
+      : null,
+    rainfall: isValidValue(apiItem.rainfall) ? Number(apiItem.rainfall) : null,
+    windDirection: isValidValue(apiItem.angle ?? apiItem.windDirection)
+      ? Number(apiItem.angle ?? apiItem.windDirection)
+      : 0,
+    waterTemperature: isValidValue(apiItem.suhuAir ?? apiItem.waterTemperature)
+      ? Number(apiItem.suhuAir ?? apiItem.waterTemperature)
+      : null,
   };
 }
 
-// Helper untuk parsing tanggal dari format "DD-MM-YY HH:mm:ss"
-function parseCustomDate(str) {
-  if (!str) return new Date('Invalid');
-  const [datePart, timePart] = str.split(' ');
-  if (!datePart || !timePart) return new Date('Invalid');
-  const [day, month, year] = datePart.split('-');
-  if (!day || !month || !year) return new Date('Invalid');
-  const fullYear = Number(year) < 100 ? 2000 + Number(year) : Number(year);
-  // Pastikan bulan dan hari dua digit
-  const mm = month.padStart(2, '0');
-  const dd = day.padStart(2, '0');
-  return new Date(`${fullYear}-${mm}-${dd}T${timePart}`);
-}
-
-const LOCAL_STORAGE_KEY = "station1_data";
+const formatUserFriendlyTimestamp = (timestamp) => {
+  const date = parseFlexibleDate(timestamp);
+  if (!date) return timestamp || '-';
+  return date.toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  });
+};
 
 const Station1 = () => {
   const [filter, setFilter] = useState('1d');
+  const [activeMode, setActiveMode] = useState(STATION_MODES.REALTIME);
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
+  const [lastActiveTimestamp, setLastActiveTimestamp] = useState(null);
+  const [lastActiveGaugeData, setLastActiveGaugeData] = useState(null);
+  const [realtimeGaugeData, setRealtimeGaugeData] = useState(EMPTY_GAUGE_DATA);
+  const [gaugeData, setGaugeData] = useState(EMPTY_GAUGE_DATA);
+  const cachedRealDataRef = useRef([]);
 
-  // Load data dari localStorage saat pertama kali mount
+  const applyRealDataset = (rows) => {
+    const validRows = (Array.isArray(rows) ? rows : [])
+      .map(mapApiData)
+      .filter((r) => r && parseFlexibleDate(r.timestamp) !== null)
+      .sort((a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp));
+
+    cachedRealDataRef.current = validRows;
+    const latestActive = findLatestActiveRecord(validRows, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+    setLastActiveTimestamp(latestActive ? latestActive.timestamp : null);
+    setLastActiveGaugeData(
+      latestActive ? toGaugePayload(latestActive, EMPTY_GAUGE_DATA) : null
+    );
+    return validRows;
+  };
+
   useEffect(() => {
     const local = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        setAllData(parsed);
-      } catch (e) {
+        const validRows = applyRealDataset(parsed);
+        setAllData(validRows);
+      } catch (_e) {
         setAllData([]);
       }
     }
+    // eslint-disable-next-line
   }, []);
 
-  // Fetch data dari API setiap 10 detik
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchRealData = async () => {
+    try {
+      if (!API_URL) return;
+      const response = await fetch(API_URL);
+      if (!response.ok) return;
+      const json = await response.json();
+      const result = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.result)
+          ? json.result
+          : [];
+
+      let local = [];
       try {
-        const response = await fetch(API_URL);
-        const json = await response.json();
-        console.log("API Response:", JSON.stringify(json, null, 2)); // Log response API
-
-        // Perbaikan: jika response langsung array
-        const result = Array.isArray(json) ? json : (Array.isArray(json.result) ? json.result : []);
-        const mapped = result.map(mapApiData);
-
-        let local = [];
-        try {
-          local = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || [];
-        } catch (e) {
-          local = [];
-        }
-
-        const timestamps = new Set(local.map(item => item.timestamp));
-        const combined = [...local];
-        mapped.forEach(item => {
-          if (!timestamps.has(item.timestamp)) {
-            combined.push(item);
-            timestamps.add(item.timestamp);
-            console.log("New data added to localStorage:", item);
-          }
-        });
-
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(combined));
-        setAllData(combined);
-      } catch (error) {
-        console.error("Fetch error:", error);
+        local = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)) || [];
+      } catch (_e) {
+        local = [];
       }
-    };
 
-    fetchData();
-    const interval = setInterval(fetchData, 10000); // 10 detik
-    return () => clearInterval(interval);
-  }, []);
-
-  // Log perubahan allData
-  useEffect(() => {
-    console.log("allData state updated:", allData);
-  }, [allData]);
-
-  // Fungsi untuk memfilter data berdasarkan waktu
-  const handleFilterChange = (filterType) => {
-    setFilter(filterType);
-
-    const now = new Date();
-    let filtered = [];
-
-    // Hanya proses data dengan timestamp valid
-    const validData = allData.filter(item => {
-      const d = parseCustomDate(item.timestamp);
-      return d instanceof Date && !isNaN(d);
-    });
-
-    if (filterType === '1d') {
-      filtered = validData.filter((item) => {
-        const itemDate = parseCustomDate(item.timestamp);
-        return (
-          itemDate.getFullYear() === now.getFullYear() &&
-          itemDate.getMonth() === now.getMonth() &&
-          itemDate.getDate() === now.getDate() &&
-          itemDate <= now
-        );
+      const timestamps = new Set(local.map((item) => item.timestamp));
+      const combined = [...local];
+      result.forEach((item) => {
+        const mappedItem = mapApiData(item);
+        if (mappedItem && !timestamps.has(mappedItem.timestamp)) {
+          combined.push(mappedItem);
+          timestamps.add(mappedItem.timestamp);
+        }
       });
-    } else if (filterType === '7d') {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      filtered = validData.filter((item) => {
-        const itemDate = parseCustomDate(item.timestamp);
-        return itemDate >= sevenDaysAgo && itemDate <= now;
-      });
-    } else if (filterType === '1m') {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(now.getMonth() - 1);
-      filtered = validData.filter((item) => {
-        const itemDate = parseCustomDate(item.timestamp);
-        return itemDate >= oneMonthAgo && itemDate <= now;
-      });
+
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(combined));
+      const validRows = applyRealDataset(combined);
+      setAllData((prev) => (activeMode === STATION_MODES.SIMULATION ? prev : validRows));
+    } catch (_error) {
+      // Keep local data if network fails
     }
-
-    filtered.sort((a, b) => parseCustomDate(a.timestamp) - parseCustomDate(b.timestamp));
-    setFilteredData(filtered);
   };
 
-  // Log perubahan filter
   useEffect(() => {
-    console.log("filter state updated:", filter);
-  }, [filter]);
+    if (activeMode === STATION_MODES.SIMULATION) {
+      const simRows = generateSimulatedRawRecords({ filter, stationSeed: 1 })
+        .map(mapApiData)
+        .filter(Boolean);
+      setAllData(simRows);
+      return undefined;
+    }
 
-  // Jalankan filter default (1 hari terakhir) saat komponen pertama kali dimuat atau data berubah
-  useEffect(() => {
-    handleFilterChange(filter);
+    fetchRealData();
+    const interval = setInterval(fetchRealData, 10000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line
-  }, [allData]);
+  }, [activeMode, filter]);
 
-  // Log perubahan filteredData
+  const handleModeChange = (nextMode) => {
+    const resolvedMode =
+      nextMode === STATION_MODES.SIMULATION && activeMode === STATION_MODES.SIMULATION
+        ? STATION_MODES.REALTIME
+        : nextMode;
+
+    setActiveMode(resolvedMode);
+
+    if (resolvedMode === STATION_MODES.SIMULATION) {
+      const simRows = generateSimulatedRawRecords({ filter, stationSeed: 1 })
+        .map(mapApiData)
+        .filter(Boolean);
+      setAllData(simRows);
+    } else if (cachedRealDataRef.current.length > 0) {
+      setAllData(cachedRealDataRef.current);
+    }
+  };
+
   useEffect(() => {
-    console.log("filteredData state updated:", filteredData);
-  }, [filteredData]);
+    const filtered = filterDataByModeRange(allData, {
+      filter,
+      mode: activeMode,
+      lastActiveTimestamp,
+    });
+    const sorted = [...filtered].sort(
+      (a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp)
+    );
+    setFilteredData(sorted);
 
-  // Ambil data terbaru (last item)
-  const latest = filteredData.length > 0 ? filteredData[filteredData.length - 1] : {};
+    const latestWindowRecord = findLatestActiveRecord(sorted, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+    const windowGauge = latestWindowRecord
+      ? toGaugePayload(latestWindowRecord, EMPTY_GAUGE_DATA)
+      : EMPTY_GAUGE_DATA;
+    setRealtimeGaugeData(windowGauge);
+  }, [allData, filter, activeMode, lastActiveTimestamp]);
 
-  // Filter data valid untuk chart (hindari error TrendChart)
-  const validChartData = filteredData.filter(item => {
-    const d = parseCustomDate(item.timestamp);
-    return d instanceof Date && !isNaN(d);
-  });
+  useEffect(() => {
+    if (activeMode === STATION_MODES.LAST_ACTIVE && lastActiveGaugeData) {
+      setGaugeData(lastActiveGaugeData);
+      return;
+    }
+    setGaugeData(realtimeGaugeData);
+  }, [activeMode, lastActiveGaugeData, realtimeGaugeData]);
+
+  const modeLabel =
+    activeMode === STATION_MODES.SIMULATION
+      ? 'Simulasi'
+      : activeMode === STATION_MODES.LAST_ACTIVE
+        ? 'Terakhir Aktif'
+        : 'Realtime';
+
+  const modeBadgeMod =
+    activeMode === STATION_MODES.SIMULATION
+      ? 'mc-mode-badge--simulation'
+      : activeMode === STATION_MODES.LAST_ACTIVE
+        ? 'mc-mode-badge--last-active'
+        : 'mc-mode-badge--realtime';
 
   return (
-    <section
-      style={{
-        backgroundColor: '#f8f9fa',
-        color: '#212529',
-        minHeight: '100vh',
-        padding: '20px 0',
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+    <section className="mc-station-page">
       <Container>
-        <Row className="mb-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Environment Status</h2>
-            <p className="text-center">Data collected from the station 1</p>
-          </Col>
-        </Row>
-        
-        <Row className="g-4">
-          {FIELD_CONFIG.map((field, idx) => {
+        <div className="mc-station-header mb-4">
+          <div>
+            <span className="mc-station-header__eyebrow">Dashboard Stasiun Pemantauan</span>
+            <h2 className="mc-station-header__title">Environment Status</h2>
+            <p className="mc-station-header__subtitle">
+              Data collected from Station 1
+            </p>
+          </div>
+
+          <div className="mc-station-header__meta">
+            <div className="mc-status-chip">
+              <span className="text-muted">Terakhir data alat aktif:</span>{' '}
+              <strong>
+                {lastActiveTimestamp ? formatUserFriendlyTimestamp(lastActiveTimestamp) : 'Belum ada data aktif'}
+              </strong>
+            </div>
+            <div className="mc-status-chip">
+              <span className="text-muted">Sumber data:</span>{' '}
+              <span className={`mc-mode-badge ${modeBadgeMod}`}>{modeLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mc-station-toolbar mb-4">
+          <div className="mc-mode-group" role="group" aria-label="Pilih mode tampilan">
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.REALTIME ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handleModeChange(STATION_MODES.REALTIME)}
+            >
+              Mode Realtime
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.LAST_ACTIVE ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handleModeChange(STATION_MODES.LAST_ACTIVE)}
+              disabled={!lastActiveGaugeData}
+            >
+              Mode Terakhir Aktif
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.SIMULATION ? 'btn-warning' : 'btn-outline-warning'}`}
+              onClick={() => handleModeChange(STATION_MODES.SIMULATION)}
+            >
+              Mode Simulasi {activeMode === STATION_MODES.SIMULATION ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+
+        <Row className="g-3 mb-4">
+          {FIELD_CONFIG.map((field) => {
             const GaugeComponent = field.gauge;
+            const value = typeof gaugeData[field.key] === 'number' ? gaugeData[field.key] : 0;
             return (
-              <Col md={4} className="text-center" key={field.key}>
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-                  <GaugeComponent {...{ [field.key]: latest[field.key] ?? 0 }} />
-                  <h5>{field.label}</h5>
-                  <p>
-                    {latest[field.key] !== undefined && latest[field.key] !== null
-                      ? `${latest[field.key]}${field.unit}`
-                      : 'N/A'}
-                  </p>
+              <Col xs={12} sm={6} lg={3} key={field.key}>
+                <div className="mc-sensor-card">
+                  <div className="mc-sensor-card__header">
+                    <h5 className="mc-sensor-card__title">{field.label}</h5>
+                    <span className="mc-sensor-card__unit-tag">{field.unit}</span>
+                  </div>
+                  <GaugeComponent {...{ [field.key]: value }} />
+                  <p className="mc-sensor-card__value">{`${value}${field.unit}`}</p>
                 </div>
               </Col>
             );
           })}
         </Row>
 
-        <Row className="mt-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Chart Status</h2>
-          </Col>
-        </Row>
-
-        <Row>
-          <ButtonGroup className="mb-3 d-flex justify-content-center">
-            <Button
-              variant={filter === '1d' ? 'primary' : 'outline-primary'}
-              onClick={() => handleFilterChange('1d')}
-            >
-              1 Day
-            </Button>
-            <Button
-              variant={filter === '7d' ? 'primary' : 'outline-primary'}
-              onClick={() => handleFilterChange('7d')}
-            >
-              7 Days
-            </Button>
-            <Button
-              variant={filter === '1m' ? 'primary' : 'outline-primary'}
-              onClick={() => handleFilterChange('1m')}
-            >
-              1 Month
-            </Button>
-          </ButtonGroup>
-          <Col md={12}>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <TrendChart data={validChartData} />
+        <div className="mc-section-card mb-4">
+          <div className="mc-section-card__header">
+            <div>
+              <h4 className="mc-section-card__title">Chart Status</h4>
+              <p className="mc-section-card__subtitle">
+                Tren perubahan parameter lingkungan berdasarkan rentang waktu
+              </p>
             </div>
-          </Col>
+            <ButtonGroup size="sm">
+              <Button
+                variant={filter === '1d' ? 'primary' : 'outline-primary'}
+                onClick={() => setFilter('1d')}
+              >
+                1 Hari Terakhir
+              </Button>
+              <Button
+                variant={filter === '7d' ? 'primary' : 'outline-primary'}
+                onClick={() => setFilter('7d')}
+              >
+                7 Hari Terakhir
+              </Button>
+              <Button
+                variant={filter === '1m' ? 'primary' : 'outline-primary'}
+                onClick={() => setFilter('1m')}
+              >
+                1 Bulan Terakhir
+              </Button>
+            </ButtonGroup>
+          </div>
+          <TrendChart data={filteredData} />
+        </div>
 
-          {/* ini buat maps */}
-          <Col md={12}>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <h4 style={{ color: '#007bff' }}>Location</h4>
-              <iframe
-                title="Location map of Station 1"
-                src="https://www.google.com/maps/embed?pb=!4v1742927582633!6m8!1m7!1semWwMLjxPNBvkFSf0-d_fQ!2m2!1d-5.570831564383814!2d105.240617222604!3f101.32!4f28.680000000000007!5f0.42518105702959824"
-                className="station-map"
-                allowFullScreen=""
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
+        <div className="mc-section-card mb-4">
+          <div className="mc-section-card__header">
+            <div>
+              <h4 className="mc-section-card__title">Location</h4>
+              <p className="mc-section-card__subtitle">Lokasi geografis penempatan sensor Station 1</p>
             </div>
-          </Col>
-          {/* ini buat maps */}
-        </Row>
+          </div>
+          <iframe
+            title="Location map of Station 1"
+            src="https://www.google.com/maps/embed?pb=!4v1742927582633!6m8!1m7!1semWwMLjxPNBvkFSf0-d_fQ!2m2!1d-5.570831564383814!2d105.240617222604!3f101.32!4f28.680000000000007!5f0.42518105702959824"
+            className="station-map"
+            allowFullScreen=""
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
 
-        <Row className="mt-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Table Status</h2>
-          </Col>
-        </Row>
-        <Row>
-          <Col>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)', overflowX: 'auto' }}>
-              {filteredData.length > 0 ? (
-                <Table striped bordered hover variant="light" style={{ marginBottom: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Timestamp</th>
-                      {FIELD_CONFIG.map(field => (
-                        <th key={field.key}>{field.label}</th>
+        <div className="mc-section-card">
+          <div className="mc-section-card__header">
+            <div>
+              <h4 className="mc-section-card__title">Table Status</h4>
+              <p className="mc-section-card__subtitle">10 rekaman pembacaan terbaru pada rentang terpilih</p>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            {filteredData.length > 0 ? (
+              <Table hover responsive className="mc-data-table mb-0">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    {FIELD_CONFIG.map((field) => (
+                      <th key={field.key}>{field.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.slice(0, 10).map((item, index) => (
+                    <tr key={index}>
+                      <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
+                      {FIELD_CONFIG.map((field) => (
+                        <td key={field.key}>
+                          {item[field.key] !== undefined && item[field.key] !== null
+                            ? `${item[field.key]}${field.unit}`
+                            : 'N/A'}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredData.map((item, index) => (
-                      <tr key={index}>
-                        <td>{item.timestamp}</td>
-                        {FIELD_CONFIG.map(field => (
-                          <td key={field.key}>
-                            {item[field.key] !== undefined && item[field.key] !== null
-                              ? `${item[field.key]}${field.unit}`
-                              : 'N/A'}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              ) : (
-                <p className="text-center" style={{ color: '#007bff' }}>No data available for the selected filter</p>
-              )}
-            </div>
-          </Col>
-        </Row>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <div className="mc-empty-state">No data available for the selected filter</div>
+            )}
+          </div>
+        </div>
       </Container>
     </section>
   );

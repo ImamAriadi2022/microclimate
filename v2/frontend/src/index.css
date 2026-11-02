@@ -1,8 +1,10 @@
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  background-color: #f3f7f5;
+  color: #162620;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -12,16 +14,20 @@ code {
     monospace;
 }
 
+/* ==========================================================================
+   App Shell & Sidebar (Public Station Dashboards)
+   ========================================================================== */
 .app-shell {
   display: flex;
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background-color: #f3f7f5;
 }
 
 .app-content {
   width: 100%;
-  margin-left: 250px;
-  transition: margin-left 0.3s ease;
+  margin-left: 260px;
+  min-height: 100vh;
+  transition: margin-left 0.25s ease;
 }
 
 .app-content--collapsed {
@@ -32,74 +38,462 @@ code {
   position: fixed;
   top: 0;
   left: 0;
-  width: 250px;
+  width: 260px;
   height: 100vh;
-  background-color: #f8f9fa;
-  padding: 20px;
+  background-color: #ffffff;
+  border-right: 1px solid #dce6e0;
+  padding: 22px 16px;
   overflow-x: hidden;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease, width 0.3s ease, padding 0.3s ease, box-shadow 0.3s ease;
+  overflow-y: auto;
+  box-shadow: 4px 0 20px rgba(15, 42, 34, 0.04);
+  transition: transform 0.25s ease, width 0.25s ease, padding 0.25s ease, box-shadow 0.25s ease;
   z-index: 1040;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar--closed {
   width: 0;
   padding: 0;
+  border-right: none;
   box-shadow: none;
 }
 
 .sidebar-logo {
-  text-align: center;
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px 18px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e6efea;
 }
 
 .sidebar-logo img {
-  width: 150px;
+  width: 148px;
   max-width: 100%;
   height: auto;
+  border-radius: 8px;
+}
+
+.sidebar-region-badge {
+  margin-top: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #08754c;
+  background-color: #eaf5ef;
+  border: 1px solid rgba(15, 155, 99, 0.22);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.sidebar-section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7f76;
+  padding: 0 12px;
+  margin-bottom: 8px;
 }
 
 .sidebar-nav {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sidebar-nav li {
-  margin-bottom: 15px;
+  margin: 0;
 }
 
 .sidebar-link {
   text-decoration: none;
-  color: #000;
+  color: #33473f;
+  font-size: 0.92rem;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: all 0.18s ease;
+}
+
+.sidebar-link svg {
+  font-size: 1rem;
+  color: #647a70;
+  flex-shrink: 0;
+  transition: color 0.18s ease;
+}
+
+.sidebar-link:hover {
+  background-color: #f1f7f4;
+  color: #0f2a22;
+}
+
+.sidebar-link:hover svg {
+  color: #0f9b63;
+}
+
+.sidebar-link--active {
+  background-color: #eaf5ef;
+  color: #08754c;
+  font-weight: 600;
+}
+
+.sidebar-link--active svg {
+  color: #0f9b63;
 }
 
 .sidebar-toggle {
   position: fixed;
-  top: 16px;
-  left: 16px;
+  top: 18px;
+  left: 18px;
   z-index: 1100;
   cursor: pointer;
-  border: none;
+  border: 1px solid #dce6e0;
   background: #ffffff;
-  border-radius: 8px;
-  padding: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition: left 0.3s ease;
+  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(15, 42, 34, 0.08);
+  transition: left 0.25s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.sidebar-toggle:hover {
+  background-color: #f4faf7;
+  box-shadow: 0 6px 16px rgba(15, 42, 34, 0.12);
 }
 
 .sidebar-toggle--shifted {
-  left: 260px;
+  left: 276px;
 }
 
 .sidebar-toggle svg {
-  font-size: 24px;
-  color: #007bff;
+  font-size: 18px;
+  color: #08754c;
 }
 
+/* ==========================================================================
+   Station Monitoring Dashboard Layout (Public & Custom)
+   ========================================================================== */
+.mc-station-page,
+.mc-custom-station {
+  background-color: #f3f7f5;
+  color: #162620;
+  min-height: 100vh;
+  padding: 28px 16px 48px;
+}
+
+.mc-station-container {
+  max-width: 1320px;
+}
+
+.mc-station-header {
+  background: #ffffff;
+  border: 1px solid #dce6e0;
+  border-radius: 16px;
+  padding: 22px 26px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  box-shadow: 0 4px 16px rgba(15, 42, 34, 0.04);
+}
+
+.mc-station-header__eyebrow {
+  display: inline-block;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #0f9b63;
+  margin-bottom: 4px;
+}
+
+.mc-station-header__title {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: #12241d;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.mc-station-header__subtitle {
+  font-size: 0.92rem;
+  color: #5a7066;
+  margin: 0;
+}
+
+.mc-station-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.mc-status-chip {
+  background: #f6faf8;
+  border: 1px solid #dce6e0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.84rem;
+  color: #33473f;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mc-status-chip__label {
+  color: #647a70;
+  font-weight: 500;
+}
+
+.mc-status-chip__value {
+  color: #12241d;
+  font-weight: 600;
+}
+
+.mc-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mc-mode-badge--realtime {
+  background-color: #e7f6ef;
+  color: #08754c;
+}
+
+.mc-mode-badge--last-active {
+  background-color: #e8f1ff;
+  color: #0b5ed7;
+}
+
+.mc-mode-badge--simulation {
+  background-color: #fff3cd;
+  color: #b45309;
+}
+
+.mc-station-toolbar {
+  background: #ffffff;
+  border: 1px solid #dce6e0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 2px 10px rgba(15, 42, 34, 0.03);
+}
+
+.mc-station-toolbar__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #5a7066;
+  margin-right: 4px;
+}
+
+.mc-mode-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: #f3f7f5;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #e2ece7;
+}
+
+.mc-mode-group .btn {
+  border-radius: 8px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  transition: all 0.16s ease;
+}
+
+/* Sensor Gauge Cards */
+.mc-sensor-card {
+  background: #ffffff;
+  border: 1px solid #dce6e0;
+  border-radius: 14px;
+  padding: 18px 16px 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 3px 12px rgba(15, 42, 34, 0.035);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.mc-sensor-card:hover {
+  transform: translateY(-2px);
+  border-color: #c2d6cc;
+  box-shadow: 0 8px 22px rgba(15, 42, 34, 0.07);
+}
+
+.mc-sensor-card__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f5f2;
+}
+
+.mc-sensor-card__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2c4038;
+  margin: 0;
+}
+
+.mc-sensor-card__unit-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #647a70;
+  background: #f3f7f5;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.mc-sensor-card__value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #12241d;
+  margin: 8px 0 0;
+}
+
+.gauge-wrapper {
+  width: 100%;
+  max-width: 195px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mc-gauge-category {
+  display: inline-block;
+  margin: 2px 0 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background-color: #f3f7f5;
+  border: 1px solid #e2ece7;
+  color: #33473f;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Section Cards (Filter, Chart, Table) */
+.mc-section-card {
+  background: #ffffff;
+  border: 1px solid #dce6e0;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 4px 16px rgba(15, 42, 34, 0.035);
+}
+
+.mc-section-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #edf3f0;
+}
+
+.mc-section-card__title {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: #12241d;
+  margin: 0;
+}
+
+.mc-section-card__subtitle {
+  font-size: 0.84rem;
+  color: #647a70;
+  margin: 2px 0 0;
+}
+
+.mc-chart-item-card {
+  background: #ffffff;
+  border: 1px solid #e2ece7;
+  border-radius: 12px;
+  padding: 16px 14px 10px;
+  height: 100%;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.mc-chart-item-card:hover {
+  border-color: #0f9b63;
+  box-shadow: 0 6px 18px rgba(15, 42, 34, 0.07);
+  transform: translateY(-2px);
+}
+
+.mc-chart-item-card__title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1e332b;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.mc-data-table {
+  font-size: 0.87rem;
+  margin-bottom: 0;
+}
+
+.mc-data-table thead th {
+  background-color: #f6faf8 !important;
+  color: #465c52;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom-width: 1px;
+  padding: 11px 12px;
+  white-space: nowrap;
+}
+
+.mc-data-table tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  color: #1e332b;
+}
+
+.mc-empty-state {
+  padding: 36px 20px;
+  text-align: center;
+  color: #5a7066;
+  background: #f8fbf9;
+  border: 1px dashed #cfe0d7;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+/* Landing Page Styles */
 .navbar-logo {
   width: 180px;
   max-width: 60vw;
@@ -120,16 +514,11 @@ code {
   padding: 0 16px;
 }
 
-.gauge-wrapper {
-  width: 100%;
-  max-width: 200px;
-  margin: 0 auto;
-}
-
 .station-map {
   width: 100%;
-  height: 300px;
+  height: 320px;
   border: 0;
+  border-radius: 12px;
 }
 
 @media (max-width: 991px) {
@@ -138,19 +527,24 @@ code {
   }
 
   .sidebar {
-    width: 250px;
+    width: 260px;
     transform: translateX(0);
   }
 
   .sidebar--closed {
-    width: 250px;
-    padding: 20px;
+    width: 260px;
+    padding: 22px 16px;
     transform: translateX(-100%);
     box-shadow: none;
   }
 
   .sidebar-toggle--shifted {
-    left: 16px;
+    left: 18px;
+  }
+
+  .mc-station-page,
+  .mc-custom-station {
+    padding-top: 68px;
   }
 }
 
@@ -161,6 +555,14 @@ code {
 
   .hero-row {
     padding-top: 20px;
+  }
+
+  .mc-station-header {
+    padding: 18px;
+  }
+
+  .mc-section-card {
+    padding: 16px;
   }
 }
 

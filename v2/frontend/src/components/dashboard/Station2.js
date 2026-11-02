@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, ButtonGroup, Col, Container, Row, Table } from 'react-bootstrap';
 import { PETENGORAN_TOPIC5_URL } from '../../config/apiEndpoints';
+import {
+  STATION_MODES,
+  filterDataByModeRange,
+  findLatestActiveRecord,
+  generateSimulatedRawRecords,
+  parseFlexibleDate,
+  parseFlexibleTimestamp,
+  toGaugePayload,
+} from '../../utils/stationModeUtils';
 import TrendChart from "./chart";
 
-// Import komponen status environment (gauge)
+import AirPressureGauge from './status/AirPressure';
 import HumidityGauge from './status/HumidityGauge';
 import IrradiationGauge from './status/Irradiation';
 import RainfallGauge from './status/Rainfall';
@@ -14,302 +23,481 @@ import WindSpeedGauge from './status/WindSpeed';
 const API_URL = PETENGORAN_TOPIC5_URL;
 const LOCAL_STORAGE_KEY = "station2_data";
 
-// Mapping function mirip Station1 Sebesi
+const EMPTY_GAUGE_DATA = {
+  humidity: 0,
+  temperature: 0,
+  airPressure: 0,
+  windspeed: 0,
+  rainfall: 0,
+  irradiation: 0,
+  windDirection: 0,
+  temperature2: 0,
+};
+
+const PRIMARY_SENSOR_KEYS = ['humidity', 'temperature', 'rainfall', 'windspeed'];
+const ALL_SENSOR_KEYS = [
+  'humidity',
+  'temperature',
+  'airPressure',
+  'windspeed',
+  'rainfall',
+  'irradiation',
+  'windDirection',
+  'temperature2',
+];
+
+const isValidValue = (val) =>
+  val !== null &&
+  val !== undefined &&
+  val !== '' &&
+  val !== 'error' &&
+  val !== 'alat rusak' &&
+  val !== 'server sedang eror' &&
+  !isNaN(Number(val));
+
 function mapApiData(item) {
+  if (!item) return null;
+  const ts = parseFlexibleTimestamp(item.timestamp);
+  if (!ts) return null;
   return {
-    timestamp: item.timestamp || 'alat rusak',
-    humidity: item.humidity == null ? 'server sedang eror' : item.humidity,
-    temperature: item.temperature == null ? 'server sedang eror' : item.temperature,
-    airPressure: item.AirPressure == null ? 'server sedang eror' : item.AirPressure,
-    windspeed: item.windSpeed == null ? 'server sedang eror' : item.windSpeed,
-    rainfall: item.rainfall == null ? 'server sedang eror' : item.rainfall,
-    irradiation: item.pyrano == null ? 'server sedang eror' : item.pyrano,
-    windDirection: (item.direction ?? item.angle) == null ? 'server sedang eror' : (item.direction ?? item.angle),
-    temperature2: (item.bmpTemperature ?? item.waterTemperature) == null ? 'server sedang eror' : (item.bmpTemperature ?? item.waterTemperature),
+    timestamp: ts,
+    humidity: isValidValue(item.humidity) ? Number(item.humidity) : null,
+    temperature: isValidValue(item.temperature) ? Number(item.temperature) : null,
+    airPressure: isValidValue(item.AirPressure ?? item.airPressure)
+      ? Number(item.AirPressure ?? item.airPressure)
+      : null,
+    windspeed: isValidValue(item.windSpeed ?? item.windspeed)
+      ? Number(item.windSpeed ?? item.windspeed)
+      : null,
+    rainfall: isValidValue(item.rainfall) ? Number(item.rainfall) : null,
+    irradiation: isValidValue(item.pyrano ?? item.irradiation)
+      ? Number(item.pyrano ?? item.irradiation)
+      : null,
+    windDirection: isValidValue(item.angle ?? item.windDirection)
+      ? Number(item.angle ?? item.windDirection)
+      : 0,
+    temperature2: isValidValue(item.bmpTemperature ?? item.waterTemperature ?? item.temperature2)
+      ? Number(item.bmpTemperature ?? item.waterTemperature ?? item.temperature2)
+      : null,
   };
 }
 
-function parseCustomDate(str) {
-  if (!str) return new Date('Invalid');
-  const [datePart, timePart] = str.split(' ');
-  if (!datePart || !timePart) return new Date('Invalid');
-  const [day, month, year] = datePart.split('-');
-  if (!day || !month || !year) return new Date('Invalid');
-  const fullYear = Number(year) < 100 ? 2000 + Number(year) : Number(year);
-  const mm = month.padStart(2, '0');
-  const dd = day.padStart(2, '0');
-  return new Date(`${fullYear}-${mm}-${dd}T${timePart}`);
-}
+const formatUserFriendlyTimestamp = (timestamp) => {
+  const date = parseFlexibleDate(timestamp);
+  if (!date) return timestamp || '-';
+  return date.toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'Asia/Jakarta',
+  });
+};
 
 const Station2 = () => {
   const [filter, setFilter] = useState('1d');
+  const [activeMode, setActiveMode] = useState(STATION_MODES.REALTIME);
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [serverError, setServerError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lastActiveTimestamp, setLastActiveTimestamp] = useState(null);
+  const [lastActiveGaugeData, setLastActiveGaugeData] = useState(null);
+  const [realtimeGaugeData, setRealtimeGaugeData] = useState(EMPTY_GAUGE_DATA);
+  const [gaugeData, setGaugeData] = useState(EMPTY_GAUGE_DATA);
   const intervalRef = useRef(null);
+  const cachedRealDataRef = useRef([]);
 
-  // Load data dari localStorage saat pertama kali mount
+  const applyRealDataset = (rows) => {
+    const validRows = (Array.isArray(rows) ? rows : [])
+      .map(mapApiData)
+      .filter((r) => r && parseFlexibleDate(r.timestamp) !== null)
+      .sort((a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp));
+
+    cachedRealDataRef.current = validRows;
+    const latestActive = findLatestActiveRecord(validRows, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+    setLastActiveTimestamp(latestActive ? latestActive.timestamp : null);
+    setLastActiveGaugeData(
+      latestActive ? toGaugePayload(latestActive, EMPTY_GAUGE_DATA) : null
+    );
+    return validRows;
+  };
+
   useEffect(() => {
     const local = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        setAllData(parsed);
+        const validRows = applyRealDataset(parsed);
+        setAllData(validRows);
         setServerError(false);
-      } catch {
+      } catch (_e) {
         setAllData([]);
       }
     }
+    // eslint-disable-next-line
   }, []);
 
-  // Fetch data dari API setiap 10 detik
-  const fetchData = async () => {
+  const fetchRealData = async () => {
     setLoading(true);
     try {
+      if (!API_URL) throw new Error('No API URL');
       const response = await fetch(API_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const json = await response.json();
-      const result = Array.isArray(json) ? json : (Array.isArray(json.result) ? json.result : []);
-      const mapped = result.map(mapApiData);
+      const result = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.result)
+          ? json.result
+          : [];
+      const validRows = applyRealDataset(result);
 
-      if (mapped.length > 0) {
-        setAllData(mapped);
+      if (validRows.length > 0) {
+        setAllData(validRows);
         setServerError(false);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mapped));
-      } else {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(validRows));
+      } else if (cachedRealDataRef.current.length === 0) {
         setAllData([]);
         setServerError(true);
       }
       setLoading(false);
-    } catch (error) {
+    } catch (_error) {
       setLoading(false);
-      setServerError(true);
+      if (cachedRealDataRef.current.length === 0) {
+        setServerError(true);
+      }
     }
   };
 
   useEffect(() => {
-    fetchData();
-    intervalRef.current = setInterval(fetchData, 10000);
+    if (activeMode === STATION_MODES.SIMULATION) {
+      setServerError(false);
+      setLoading(false);
+      const simRows = generateSimulatedRawRecords({ filter, stationSeed: 2 })
+        .map(mapApiData)
+        .filter(Boolean);
+      setAllData(simRows);
+      return undefined;
+    }
+
+    fetchRealData();
+    intervalRef.current = setInterval(fetchRealData, 10000);
     return () => clearInterval(intervalRef.current);
-  }, []);
+    // eslint-disable-next-line
+  }, [activeMode, filter]);
+
+  const handleModeChange = (nextMode) => {
+    const resolvedMode =
+      nextMode === STATION_MODES.SIMULATION && activeMode === STATION_MODES.SIMULATION
+        ? STATION_MODES.REALTIME
+        : nextMode;
+
+    setActiveMode(resolvedMode);
+
+    if (resolvedMode === STATION_MODES.SIMULATION) {
+      setServerError(false);
+      const simRows = generateSimulatedRawRecords({ filter, stationSeed: 2 })
+        .map(mapApiData)
+        .filter(Boolean);
+      setAllData(simRows);
+    } else if (cachedRealDataRef.current.length > 0) {
+      setServerError(false);
+      setAllData(cachedRealDataRef.current);
+    }
+  };
 
   useEffect(() => {
-    if (serverError) {
+    if (serverError && activeMode !== STATION_MODES.SIMULATION) {
       setFilteredData([]);
+      setRealtimeGaugeData(EMPTY_GAUGE_DATA);
       return;
     }
-    let filtered = [];
-    const now = new Date();
-    if (filter === '1d') {
-      const today = now;
-      filtered = allData.filter(item => {
-        const d = parseCustomDate(item.timestamp);
-        return (
-          d.getFullYear() === today.getFullYear() &&
-          d.getMonth() === today.getMonth() &&
-          d.getDate() === today.getDate() &&
-          d <= today
-        );
-      });
-    } else if (filter === '7d') {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(now.getDate() - 7);
-      filtered = allData.filter(item => {
-        const d = parseCustomDate(item.timestamp);
-        return d >= sevenDaysAgo && d <= now;
-      });
-    } else if (filter === '1m') {
-      const oneMonthAgo = new Date();
-      oneMonthAgo.setMonth(now.getMonth() - 1);
-      filtered = allData.filter(item => {
-        const d = parseCustomDate(item.timestamp);
-        return d >= oneMonthAgo && d <= now;
-      });
-    } else {
-      filtered = allData;
-    }
-    filtered.sort((a, b) => parseCustomDate(a.timestamp) - parseCustomDate(b.timestamp));
-    setFilteredData(filtered);
-  }, [allData, filter, serverError]);
 
-  const latest = serverError
-    ? {}
-    : filteredData.length > 0
-    ? filteredData[filteredData.length - 1]
-    : {};
+    const filtered = filterDataByModeRange(allData, {
+      filter,
+      mode: activeMode,
+      lastActiveTimestamp,
+    });
+    const sorted = [...filtered].sort(
+      (a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp)
+    );
+    setFilteredData(sorted);
+
+    const latestWindowRecord = findLatestActiveRecord(sorted, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+    const windowGauge = latestWindowRecord
+      ? toGaugePayload(latestWindowRecord, EMPTY_GAUGE_DATA)
+      : EMPTY_GAUGE_DATA;
+    setRealtimeGaugeData(windowGauge);
+  }, [allData, filter, serverError, activeMode, lastActiveTimestamp]);
+
+  useEffect(() => {
+    if (activeMode === STATION_MODES.LAST_ACTIVE && lastActiveGaugeData) {
+      setGaugeData(lastActiveGaugeData);
+      return;
+    }
+    setGaugeData(realtimeGaugeData);
+  }, [activeMode, lastActiveGaugeData, realtimeGaugeData]);
+
+  const modeLabel =
+    activeMode === STATION_MODES.SIMULATION
+      ? 'Simulasi'
+      : activeMode === STATION_MODES.LAST_ACTIVE
+        ? 'Terakhir Aktif'
+        : 'Realtime';
+
+  const modeBadgeMod =
+    activeMode === STATION_MODES.SIMULATION
+      ? 'mc-mode-badge--simulation'
+      : activeMode === STATION_MODES.LAST_ACTIVE
+        ? 'mc-mode-badge--last-active'
+        : 'mc-mode-badge--realtime';
 
   return (
-    <section
-      style={{
-        backgroundColor: '#f8f9fa',
-        color: '#212529',
-        minHeight: '100vh',
-        padding: '20px 0',
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+    <section className="mc-station-page">
       <Container>
-        <Row className="mb-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Environment Status Station 2</h2>
-            <p className="text-center">Data collected from the station 2 (Topic 5)</p>
-          </Col>
-        </Row>
+        <div className="mc-station-header mb-4">
+          <div>
+            <span className="mc-station-header__eyebrow">Dashboard Stasiun Pemantauan</span>
+            <h2 className="mc-station-header__title">Environment Status Station 2</h2>
+            <p className="mc-station-header__subtitle">
+              Data collected from Station 2 (Topic 5)
+            </p>
+          </div>
 
-        {loading && (
-          <Row>
-            <Col>
-              <div className="text-center mb-4" style={{ color: '#007bff', fontWeight: 'bold' }}>
-                Loading data dari API...
-              </div>
-            </Col>
-          </Row>
+          <div className="mc-station-header__meta">
+            <div className="mc-status-chip">
+              <span className="text-muted">Terakhir data alat aktif:</span>{' '}
+              <strong>
+                {lastActiveTimestamp ? formatUserFriendlyTimestamp(lastActiveTimestamp) : 'Belum ada data aktif'}
+              </strong>
+            </div>
+            <div className="mc-status-chip">
+              <span className="text-muted">Sumber data:</span>{' '}
+              <span className={`mc-mode-badge ${modeBadgeMod}`}>{modeLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mc-station-toolbar mb-4">
+          <div className="mc-mode-group" role="group" aria-label="Pilih mode tampilan">
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.REALTIME ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handleModeChange(STATION_MODES.REALTIME)}
+            >
+              Mode Realtime
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.LAST_ACTIVE ? 'btn-primary' : 'btn-outline-primary'}`}
+              onClick={() => handleModeChange(STATION_MODES.LAST_ACTIVE)}
+              disabled={!lastActiveGaugeData}
+            >
+              Mode Terakhir Aktif
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeMode === STATION_MODES.SIMULATION ? 'btn-warning' : 'btn-outline-warning'}`}
+              onClick={() => handleModeChange(STATION_MODES.SIMULATION)}
+            >
+              Mode Simulasi {activeMode === STATION_MODES.SIMULATION ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+
+        {loading && activeMode !== STATION_MODES.SIMULATION && (
+          <div className="alert alert-info py-2 px-3 mb-4 small fw-semibold">
+            Loading data dari API...
+          </div>
         )}
 
-        <Row className="g-4">
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <HumidityGauge humidity={latest.humidity !== undefined && latest.humidity !== 'server sedang eror' ? latest.humidity : 0} />
-              <h5>Humidity</h5>
-              <p>{latest.humidity === 'server sedang eror' ? 'server sedang eror' : latest.humidity !== undefined ? latest.humidity : '-'}</p>
+        <Row className="g-3 mb-4">
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Humidity</h5>
+                <span className="mc-sensor-card__unit-tag">%</span>
+              </div>
+              <HumidityGauge humidity={typeof gaugeData.humidity === 'number' ? gaugeData.humidity : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.humidity === 'number' ? `${gaugeData.humidity}%` : '-'}</p>
             </div>
           </Col>
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <TemperatureGauge temperature={latest.temperature !== undefined && latest.temperature !== 'server sedang eror' ? latest.temperature : 0} />
-              <h5>Temperature</h5>
-              <p>{latest.temperature === 'server sedang eror' ? 'server sedang eror' : latest.temperature !== undefined ? latest.temperature : '-'}</p>
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Temperature</h5>
+                <span className="mc-sensor-card__unit-tag">°C</span>
+              </div>
+              <TemperatureGauge temperature={typeof gaugeData.temperature === 'number' ? gaugeData.temperature : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.temperature === 'number' ? `${gaugeData.temperature}°C` : '-'}</p>
             </div>
           </Col>
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <WindSpeedGauge windspeed={latest.windspeed !== undefined && latest.windspeed !== 'server sedang eror' ? latest.windspeed : 0} />
-              <h5>Windspeed</h5>
-              <p>{latest.windspeed === 'server sedang eror' ? 'server sedang eror' : latest.windspeed !== undefined ? latest.windspeed : '-'}</p>
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Air Pressure</h5>
+                <span className="mc-sensor-card__unit-tag">hPa</span>
+              </div>
+              <AirPressureGauge airPressure={typeof gaugeData.airPressure === 'number' ? gaugeData.airPressure : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.airPressure === 'number' ? `${gaugeData.airPressure} hPa` : '-'}</p>
             </div>
           </Col>
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <RainfallGauge rainfall={latest.rainfall !== undefined && latest.rainfall !== 'server sedang eror' ? latest.rainfall : 0} />
-              <h5>Rainfall</h5>
-              <p>{latest.rainfall === 'server sedang eror' ? 'server sedang eror' : latest.rainfall !== undefined ? latest.rainfall : '-'}</p>
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Windspeed</h5>
+                <span className="mc-sensor-card__unit-tag">km/h</span>
+              </div>
+              <WindSpeedGauge windspeed={typeof gaugeData.windspeed === 'number' ? gaugeData.windspeed : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.windspeed === 'number' ? `${gaugeData.windspeed} km/h` : '-'}</p>
             </div>
           </Col>
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <IrradiationGauge irradiation={latest.irradiation !== undefined && latest.irradiation !== 'server sedang eror' ? latest.irradiation : 0} />
-              <h5>Irradiation</h5>
-              <p>{latest.irradiation === 'server sedang eror' ? 'server sedang eror' : latest.irradiation !== undefined ? latest.irradiation : '-'}</p>
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Rainfall</h5>
+                <span className="mc-sensor-card__unit-tag">mm</span>
+              </div>
+              <RainfallGauge rainfall={typeof gaugeData.rainfall === 'number' ? gaugeData.rainfall : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.rainfall === 'number' ? `${gaugeData.rainfall} mm` : '-'}</p>
             </div>
           </Col>
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <WindDirectionGauge windDirection={latest.windDirection !== undefined && latest.windDirection !== 'server sedang eror' ? latest.windDirection : 0} />
-              <h5>Wind Direction</h5>
-              <p>{latest.windDirection === 'server sedang eror' ? 'server sedang eror' : latest.windDirection !== undefined ? latest.windDirection : '-'}</p>
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Irradiation</h5>
+                <span className="mc-sensor-card__unit-tag">W/m²</span>
+              </div>
+              <IrradiationGauge irradiation={typeof gaugeData.irradiation === 'number' ? gaugeData.irradiation : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.irradiation === 'number' ? `${gaugeData.irradiation} W/m²` : '-'}</p>
             </div>
           </Col>
-          <Col md={4} className="text-center">
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              <TemperatureGauge temperature={latest.temperature2 !== undefined && latest.temperature2 !== 'server sedang eror' ? latest.temperature2 : 0} />
-              <h5>Water Temperature</h5>
-              <p>{latest.temperature2 === 'server sedang eror' ? 'server sedang eror' : latest.temperature2 !== undefined ? latest.temperature2 : '-'}</p>
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Wind Direction</h5>
+                <span className="mc-sensor-card__unit-tag">°</span>
+              </div>
+              <WindDirectionGauge windDirection={typeof gaugeData.windDirection === 'number' ? gaugeData.windDirection : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.windDirection === 'number' ? `${gaugeData.windDirection}°` : '-'}</p>
             </div>
           </Col>
-        </Row>
-
-        <Row className="mt-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Chart Status</h2>
-          </Col>
-        </Row>
-        <Row>
-          <ButtonGroup className="mb-3 d-flex justify-content-center">
-            <Button
-              variant={filter === '1d' ? 'primary' : 'outline-primary'}
-              onClick={() => setFilter('1d')}
-            >
-              1 Day
-            </Button>
-            <Button
-              variant={filter === '7d' ? 'primary' : 'outline-primary'}
-              onClick={() => setFilter('7d')}
-            >
-              7 Days
-            </Button>
-            <Button
-              variant={filter === '1m' ? 'primary' : 'outline-primary'}
-              onClick={() => setFilter('1m')}
-            >
-              1 Month
-            </Button>
-          </ButtonGroup>
-          <Col md={12}>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-              {serverError ? (
-                <div className="text-center" style={{ color: 'red', fontWeight: 'bold', fontSize: '1.2em' }}>
-                  Server sedang eror
-                </div>
-              ) : filteredData.length === 0 ? (
-                <div className="text-center" style={{ color: '#007bff' }}>
-                  Tidak ada data untuk filter ini
-                </div>
-              ) : (
-                <TrendChart data={filteredData} />
-              )}
+          <Col xs={12} sm={6} lg={3}>
+            <div className="mc-sensor-card">
+              <div className="mc-sensor-card__header">
+                <h5 className="mc-sensor-card__title">Water Temperature</h5>
+                <span className="mc-sensor-card__unit-tag">°C</span>
+              </div>
+              <TemperatureGauge temperature={typeof gaugeData.temperature2 === 'number' ? gaugeData.temperature2 : 0} />
+              <p className="mc-sensor-card__value">{typeof gaugeData.temperature2 === 'number' ? `${gaugeData.temperature2}°C` : '-'}</p>
             </div>
           </Col>
         </Row>
 
-        <Row className="mt-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>Table Status</h2>
-          </Col>
-        </Row>
-        <Row>
-          <Col>
-            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)', overflowX: 'auto' }}>
-              {serverError ? (
-                <div className="text-center" style={{ color: 'red', fontWeight: 'bold', fontSize: '1.2em' }}>
-                  Server sedang eror
-                </div>
-              ) : filteredData.length > 0 ? (
-                <Table striped bordered hover variant="light" style={{ marginBottom: 0 }}>
-                  <thead>
-                    <tr>
-                      <th>Timestamp</th>
-                      <th>Humidity</th>
-                      <th>Temperature</th>
-                      <th>Air Pressure</th>
-                      <th>Rainfall</th>
-                      <th>Irradiation</th>
-                      <th>Windspeed</th>
-                      <th>Wind Direction</th>
-                      <th>Water Temperature</th>
+        <div className="mc-section-card mb-4">
+          <div className="mc-section-card__header">
+            <div>
+              <h4 className="mc-section-card__title">Chart Status</h4>
+              <p className="mc-section-card__subtitle">
+                Tren perubahan parameter lingkungan berdasarkan rentang waktu
+              </p>
+            </div>
+            <ButtonGroup size="sm">
+              <Button
+                variant={filter === '1d' ? 'primary' : 'outline-primary'}
+                onClick={() => setFilter('1d')}
+              >
+                1 Hari Terakhir
+              </Button>
+              <Button
+                variant={filter === '7d' ? 'primary' : 'outline-primary'}
+                onClick={() => setFilter('7d')}
+              >
+                7 Hari Terakhir
+              </Button>
+              <Button
+                variant={filter === '1m' ? 'primary' : 'outline-primary'}
+                onClick={() => setFilter('1m')}
+              >
+                1 Bulan Terakhir
+              </Button>
+            </ButtonGroup>
+          </div>
+          {serverError && activeMode !== STATION_MODES.SIMULATION ? (
+            <div className="mc-empty-state text-danger">
+              Server sedang eror
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div className="mc-empty-state">
+              Tidak ada data untuk filter ini
+            </div>
+          ) : (
+            <TrendChart
+              data={filteredData}
+              fields={[
+                { key: 'humidity', label: 'Humidity (%)' },
+                { key: 'temperature', label: 'Temperature (°C)' },
+                { key: 'airPressure', label: 'Air Pressure (hPa)' },
+                { key: 'windspeed', label: 'Windspeed (km/h)' },
+                { key: 'rainfall', label: 'Rainfall (mm)' },
+                { key: 'irradiation', label: 'Irradiation (W/m²)' },
+                { key: 'windDirection', label: 'Wind Direction (°)' },
+                { key: 'temperature2', label: 'Water Temperature (°C)' },
+              ]}
+            />
+          )}
+        </div>
+
+        <div className="mc-section-card">
+          <div className="mc-section-card__header">
+            <div>
+              <h4 className="mc-section-card__title">Table Status</h4>
+              <p className="mc-section-card__subtitle">10 rekaman pembacaan terbaru pada rentang terpilih</p>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            {serverError && activeMode !== STATION_MODES.SIMULATION ? (
+              <div className="mc-empty-state text-danger">
+                Server sedang eror
+              </div>
+            ) : filteredData.length > 0 ? (
+              <Table hover responsive className="mc-data-table mb-0">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Humidity</th>
+                    <th>Temperature</th>
+                    <th>Air Pressure</th>
+                    <th>Rainfall</th>
+                    <th>Irradiation</th>
+                    <th>Windspeed</th>
+                    <th>Wind Direction</th>
+                    <th>Water Temperature</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.slice(0, 10).map((item, index) => (
+                    <tr key={index}>
+                      <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
+                      <td>{item.humidity ?? '-'}</td>
+                      <td>{item.temperature ?? '-'}</td>
+                      <td>{item.airPressure ?? '-'}</td>
+                      <td>{item.rainfall ?? '-'}</td>
+                      <td>{item.irradiation ?? '-'}</td>
+                      <td>{item.windspeed ?? '-'}</td>
+                      <td>{item.windDirection ?? '-'}</td>
+                      <td>{item.temperature2 ?? '-'}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredData.map((item, index) => (
-                      <tr key={index}>
-                        <td>{item.timestamp}</td>
-                        <td>{item.humidity === 'server sedang eror' ? 'server sedang eror' : item.humidity}</td>
-                        <td>{item.temperature === 'server sedang eror' ? 'server sedang eror' : item.temperature}</td>
-                        <td>{item.airPressure === 'server sedang eror' ? 'server sedang eror' : item.airPressure}</td>
-                        <td>{item.rainfall === 'server sedang eror' ? 'server sedang eror' : item.rainfall}</td>
-                        <td>{item.irradiation === 'server sedang eror' ? 'server sedang eror' : item.irradiation}</td>
-                        <td>{item.windspeed === 'server sedang eror' ? 'server sedang eror' : item.windspeed}</td>
-                        <td>{item.windDirection === 'server sedang eror' ? 'server sedang eror' : item.windDirection}</td>
-                        <td>{item.temperature2 === 'server sedang eror' ? 'server sedang eror' : item.temperature2}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              ) : (
-                <p className="text-center" style={{ color: '#007bff' }}>No data available for the selected filter</p>
-              )}
-            </div>
-          </Col>
-        </Row>
+                  ))}
+                </tbody>
+              </Table>
+            ) : (
+              <div className="mc-empty-state">No data available for the selected filter</div>
+            )}
+          </div>
+        </div>
       </Container>
     </section>
   );

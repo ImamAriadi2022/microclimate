@@ -1,31 +1,30 @@
 import { FaDownload, FaHome, FaMapMarkerAlt, FaTachometerAlt } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ isOpen }) => {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  const isOverview = pathname === '/petengoran' || pathname === '/petengoran/';
+  const isStation1 = pathname.includes('/petengoran/station1');
+  const isStation2 = pathname.includes('/petengoran/station2');
+  const isDownload = pathname.includes('/petengoran/download');
+
   return (
-    <div
-      className={`sidebar ${isOpen ? '' : 'sidebar--closed'}`}
-    >
-      {/* Logo */}
+    <div className={`sidebar ${isOpen ? '' : 'sidebar--closed'}`}>
       {isOpen && (
         <div className="sidebar-logo">
-          <img
-            src="/img/logo.png" // Ganti dengan path logo Anda
-            alt="Logo"
-          />
-          <hr />
+          <img src="/img/logo.png" alt="Microclimate Logo" />
+          <span className="sidebar-region-badge">Petengoran</span>
         </div>
       )}
 
-      {/* Menu Items */}
       {isOpen && (
         <nav>
+          <div className="sidebar-section-label">Menu Navigasi</div>
           <ul className="sidebar-nav">
             <li>
-              <Link
-                to="/"
-                className="sidebar-link"
-              >
+              <Link to="/" className="sidebar-link">
                 <FaHome />
                 Go Home
               </Link>
@@ -33,7 +32,7 @@ const Sidebar = ({ isOpen }) => {
             <li>
               <Link
                 to="/petengoran"
-                className="sidebar-link"
+                className={`sidebar-link ${isOverview ? 'sidebar-link--active' : ''}`}
               >
                 <FaTachometerAlt />
                 Dashboard
@@ -41,8 +40,8 @@ const Sidebar = ({ isOpen }) => {
             </li>
             <li>
               <Link
-                to="station1"
-                className="sidebar-link"
+                to="/petengoran/station1"
+                className={`sidebar-link ${isStation1 ? 'sidebar-link--active' : ''}`}
               >
                 <FaMapMarkerAlt />
                 Station 1
@@ -50,8 +49,8 @@ const Sidebar = ({ isOpen }) => {
             </li>
             <li>
               <Link
-                to="station2"
-                className="sidebar-link"
+                to="/petengoran/station2"
+                className={`sidebar-link ${isStation2 ? 'sidebar-link--active' : ''}`}
               >
                 <FaMapMarkerAlt />
                 Station 2
@@ -59,8 +58,8 @@ const Sidebar = ({ isOpen }) => {
             </li>
             <li>
               <Link
-                to="download"
-                className="sidebar-link"
+                to="/petengoran/download"
+                className={`sidebar-link ${isDownload ? 'sidebar-link--active' : ''}`}
               >
                 <FaDownload />
                 Download Data

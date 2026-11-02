@@ -1,89 +1,57 @@
 import { FaDownload, FaHome, FaMapMarkerAlt, FaTachometerAlt } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ isOpen }) => {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  const isOverview = pathname === '/kalimantan' || pathname === '/kalimantan/';
+  const isStation1 = pathname.includes('/kalimantan/station1');
+  const isDownload = pathname.includes('/kalimantan/download');
+
   return (
-    <div
-      style={{
-        width: isOpen ? '250px' : '0', // Lebar sidebar berubah berdasarkan isOpen
-        height: '100vh',
-        backgroundColor: '#f8f9fa',
-        padding: isOpen ? '20px' : '0', // Padding dihapus saat sidebar ditutup
-        position: 'fixed',
-        boxShadow: isOpen ? '2px 0 5px rgba(0, 0, 0, 0.1)' : 'none',
-        overflowX: 'hidden', // Menyembunyikan konten saat sidebar ditutup
-        transition: '0.3s', // Animasi transisi
-      }}
-    >
-      {/* Logo */}
+    <div className={`sidebar ${isOpen ? '' : 'sidebar--closed'}`}>
       {isOpen && (
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <img
-            src="/img/logo.png" // Ganti dengan path logo Anda
-            alt="Logo"
-            style={{ width: '150px', marginBottom: '10px' }}
-          />
-          <hr />
+        <div className="sidebar-logo">
+          <img src="/img/logo.png" alt="Microclimate Logo" />
+          <span className="sidebar-region-badge">Kalimantan</span>
         </div>
       )}
 
-      {/* Menu Items */}
       {isOpen && (
         <nav>
-          <ul style={{ listStyleType: 'none', padding: 0 }}>
-            <li style={{ marginBottom: '15px' }}>
-              <Link
-                to="/"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <FaHome style={{ marginRight: '10px' }} />
+          <div className="sidebar-section-label">Menu Navigasi</div>
+          <ul className="sidebar-nav">
+            <li>
+              <Link to="/" className="sidebar-link">
+                <FaHome />
                 Go Home
               </Link>
             </li>
-            <li style={{ marginBottom: '15px' }}>
+            <li>
               <Link
                 to="/kalimantan"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                className={`sidebar-link ${isOverview ? 'sidebar-link--active' : ''}`}
               >
-                <FaTachometerAlt style={{ marginRight: '10px' }} />
+                <FaTachometerAlt />
                 Dashboard
               </Link>
             </li>
-            <li style={{ marginBottom: '15px' }}>
+            <li>
               <Link
-                to="station1"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                to="/kalimantan/station1"
+                className={`sidebar-link ${isStation1 ? 'sidebar-link--active' : ''}`}
               >
-                <FaMapMarkerAlt style={{ marginRight: '10px' }} />
+                <FaMapMarkerAlt />
                 Station 1
               </Link>
             </li>
             <li>
               <Link
-                to="download"
-                style={{
-                  textDecoration: 'none',
-                  color: '#000',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
+                to="/kalimantan/download"
+                className={`sidebar-link ${isDownload ? 'sidebar-link--active' : ''}`}
               >
-                <FaDownload style={{ marginRight: '10px' }} />
+                <FaDownload />
                 Download Data
               </Link>
             </li>

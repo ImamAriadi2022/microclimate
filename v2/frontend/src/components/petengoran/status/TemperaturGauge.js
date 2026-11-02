@@ -1,7 +1,13 @@
 import GaugeChart from "react-gauge-chart";
 
-const TemperatureGauge = ({ temperature }) => {
-  // Function to determine category based on temperature
+const clampPercent = (val) => {
+  if (!Number.isFinite(val)) return 0;
+  return Math.min(1, Math.max(0, val));
+};
+
+const TemperatureGauge = ({ temperature = 0 }) => {
+  const safeVal = typeof temperature === "number" && !isNaN(temperature) ? temperature : 0;
+
   const getCategory = (temp) => {
     if (temp < 15) return "Cold";
     if (temp < 20) return "Cool";
@@ -11,18 +17,16 @@ const TemperatureGauge = ({ temperature }) => {
     return "Very Hot";
   };
 
-  // Function to determine color based on category
   const getColor = (temp) => {
-    if (temp < 15) return ["#0000FF", "#e6e6e6"]; // Blue
-    if (temp < 20) return ["#87CEEB", "#e6e6e6"]; // Light Blue
-    if (temp < 25) return ["#00FF00", "#e6e6e6"]; // Green
-    if (temp < 30) return ["#FFD700", "#e6e6e6"]; // Yellow
-    if (temp < 35) return ["#FFA500", "#e6e6e6"]; // Orange
-    return ["#FF4500", "#e6e6e6"]; // Red
+    if (temp < 15) return ["#3b82f6", "#e9eff2"];
+    if (temp < 20) return ["#0ea5e9", "#e9eff2"];
+    if (temp < 25) return ["#10b981", "#e9eff2"];
+    if (temp < 30) return ["#f59e0b", "#e9eff2"];
+    if (temp < 35) return ["#f97316", "#e9eff2"];
+    return ["#ef4444", "#e9eff2"];
   };
 
-  // Calculate percent value for GaugeChart
-  const percentValue = (temperature - 10) / 30; // Assume temperature range is 10°C to 40°C
+  const percentValue = clampPercent(safeVal <= 0 ? 0 : (safeVal - 10) / 30);
 
   return (
     <div className="gauge-wrapper">
@@ -30,18 +34,16 @@ const TemperatureGauge = ({ temperature }) => {
         id="temperature-gauge"
         nrOfLevels={100}
         arcsLength={[percentValue, 1 - percentValue]}
-        colors={getColor(temperature)} // Color based on category
+        colors={getColor(safeVal)}
         percent={percentValue}
         arcPadding={0.01}
         cornerRadius={3}
-        needleColor="#464A4F"
-        needleBaseColor="#464A4F"
-        textColor="#000000"
-        formatTextValue={() => `${temperature.toFixed(1)}°C`}
+        needleColor="#33473f"
+        needleBaseColor="#33473f"
+        textColor="#12241d"
+        formatTextValue={() => `${safeVal.toFixed(1)}°C`}
       />
-      <p style={{ textAlign: "center", marginTop: "-10px", fontWeight: "bold" }}>
-        {getCategory(temperature)}
-      </p>
+      <span className="mc-gauge-category">{getCategory(safeVal)}</span>
     </div>
   );
 };

@@ -1,7 +1,13 @@
 import GaugeChart from "react-gauge-chart";
 
-const AirPressureGauge = ({ airPressure }) => {
-  // Function to determine category based on air pressure
+const clampPercent = (val) => {
+  if (!Number.isFinite(val)) return 0;
+  return Math.min(1, Math.max(0, val));
+};
+
+const AirPressureGauge = ({ airPressure = 0 }) => {
+  const safeVal = typeof airPressure === "number" && !isNaN(airPressure) ? airPressure : 0;
+
   const getCategory = (pressure) => {
     if (pressure < 1000) return "Low";
     if (pressure <= 1020) return "Normal";
@@ -9,16 +15,14 @@ const AirPressureGauge = ({ airPressure }) => {
     return "Very High";
   };
 
-  // Function to determine color based on category
   const getColor = (pressure) => {
-    if (pressure < 1000) return ["#00FF00", "#e6e6e6"]; // Green
-    if (pressure <= 1020) return ["#ADFF2F", "#e6e6e6"]; // Light Green
-    if (pressure <= 1040) return ["#FFD700", "#FFA500"]; // Yellow and Orange
-    return ["#FF4500", "#e6e6e6"]; // Red
+    if (pressure < 1000) return ["#0ea5e9", "#e9eff2"];
+    if (pressure <= 1020) return ["#10b981", "#e9eff2"];
+    if (pressure <= 1040) return ["#f59e0b", "#e9eff2"];
+    return ["#ef4444", "#e9eff2"];
   };
 
-  // Calculate percent value for GaugeChart
-  const percentValue = (airPressure - 950) / 120;
+  const percentValue = clampPercent(safeVal <= 0 ? 0 : (safeVal - 950) / 120);
 
   return (
     <div className="gauge-wrapper">
@@ -26,18 +30,16 @@ const AirPressureGauge = ({ airPressure }) => {
         id="air-pressure-gauge"
         nrOfLevels={100}
         arcsLength={[percentValue, 1 - percentValue]}
-        colors={getColor(airPressure)} // Color based on category
+        colors={getColor(safeVal)}
         percent={percentValue}
         arcPadding={0.01}
         cornerRadius={3}
-        needleColor="#464A4F"
-        needleBaseColor="#464A4F"
-        textColor="#000000"
-        formatTextValue={() => `${airPressure.toFixed(1)} hPa`}
+        needleColor="#33473f"
+        needleBaseColor="#33473f"
+        textColor="#12241d"
+        formatTextValue={() => `${safeVal.toFixed(1)} hPa`}
       />
-      <p style={{ textAlign: "center", marginTop: "-10px", fontWeight: "bold" }}>
-        {getCategory(airPressure)}
-      </p>
+      <span className="mc-gauge-category">{getCategory(safeVal)}</span>
     </div>
   );
 };

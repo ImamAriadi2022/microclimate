@@ -10,9 +10,9 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+import { parseFlexibleDate } from "../../utils/stationModeUtils";
 
-// Field config harus sama urutan & key-nya dengan Station1.js
-const FIELD_CONFIG = [
+const DEFAULT_FIELD_CONFIG = [
   { key: 'humidity', label: 'Humidity (%)' },
   { key: 'temperature', label: 'Temperature (°C)' },
   { key: 'airPressure', label: 'Air Pressure (hPa)' },
@@ -22,123 +22,71 @@ const FIELD_CONFIG = [
   { key: 'waterTemperature', label: 'Water Temperature (°C)' },
 ];
 
-// Fungsi parsing tanggal custom (format: DD-MM-YY HH:mm:ss)
-function parseCustomDate(str) {
-  if (!str) return NaN;
-  const [datePart, timePart] = str.split(' ');
-  if (!datePart || !timePart) return NaN;
-  const [day, month, year] = datePart.split('-');
-  if (!day || !month || !year) return NaN;
-  const fullYear = Number(year) < 100 ? 2000 + Number(year) : Number(year);
-  const mm = month.padStart(2, '0');
-  const dd = day.padStart(2, '0');
-  return new Date(`${fullYear}-${mm}-${dd}T${timePart}`).getTime();
-}
-
-const TrendChart = ({ data, filter = '1d' }) => {
+const TrendChart = ({ data = [], fields = DEFAULT_FIELD_CONFIG }) => {
   const [showDetail, setShowDetail] = useState(false);
-  const [selectedMetric, setSelectedMetric] = useState(FIELD_CONFIG[0].key);
+  const [selectedMetric, setSelectedMetric] = useState(fields[0]?.key || 'humidity');
   const [interval, setInterval] = useState(15);
 
-  // Pastikan hanya data dengan timestamp valid yang diproses
-  const parsedData = data
+  const mainChartData = (Array.isArray(data) ? data : [])
     .map((item) => {
-      const t = typeof item.timestamp === "number" ? item.timestamp : parseCustomDate(item.timestamp);
-      if (isNaN(t)) return null;
-      return { ...item, timestamp: t };
+      const parsedDate = parseFlexibleDate(item?.timestamp);
+      if (!parsedDate) return null;
+      return { ...item, timestamp: parsedDate.getTime() };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
-  console.log("TrendChart received data:", data);
-  console.log("TrendChart parsedData:", parsedData);
-
-  // Filter data sesuai filter dari props
-  const filterDataByRange = () => {
-    if (!parsedData.length) return [];
-    const now = Date.now();
-    let start = now;
-    if (filter === '1d') {
-      const d = new Date(now);
-      d.setHours(0, 0, 0, 0);
-      start = d.getTime();
-    } else if (filter === '7d') {
-      start = now - 7 * 24 * 60 * 60 * 1000;
-    } else if (filter === '1m') {
-      const d = new Date(now);
-      d.setMonth(d.getMonth() - 1);
-      start = d.getTime();
-    }
-    const filtered = parsedData.filter(item => item.timestamp >= start && item.timestamp <= now);
-    console.log(`TrendChart mainChartData for filter "${filter}":`, filtered);
-    return filtered;
-  };
-
-  // Data untuk chart utama (sesuai filter)
-  const mainChartData = filterDataByRange();
-
-  // Untuk modal detail, gunakan interval
   const filterDataByInterval = (intervalMinutes) => {
     const filtered = [];
     let last = null;
-    for (let i = 0; i < mainChartData.length; i++) {
-      const now = mainChartData[i].timestamp;
-      if (!now || isNaN(now)) continue;
-      if (!last || now - last >= intervalMinutes * 60 * 1000) {
+    for (let i = 0; i < mainChartData.length; i += 1) {
+      const currentTs = mainChartData[i].timestamp;
+      if (!currentTs || Number.isNaN(currentTs)) continue;
+      if (!last || currentTs - last >= intervalMinutes * 60 * 1000) {
         filtered.push(mainChartData[i]);
-        last = now;
+        last = currentTs;
       }
     }
-    // Jika hasil kosong, tampilkan minimal 1 data
     if (filtered.length === 0 && mainChartData.length > 0) {
       filtered.push(mainChartData[0]);
     }
-    console.log(`TrendChart filterDataByInterval (${intervalMinutes} min):`, filtered);
     return filtered;
   };
 
-  // Hitung domain waktu X
   const getXAxisDomain = (filtered) => {
     if (filtered.length < 2) return ["auto", "auto"];
-    const times = filtered.map((d) => d.timestamp).filter((t) => t && !isNaN(t));
+    const times = filtered.map((d) => d.timestamp).filter((t) => t && !Number.isNaN(t));
     if (!times.length) return ["auto", "auto"];
-    const min = Math.min(...times);
-    const max = Math.max(...times);
-    return [min, max];
+    return [Math.min(...times), Math.max(...times)];
   };
 
   return (
     <>
-      <Row>
-        {FIELD_CONFIG.map((field) => (
-          <Col md={4} key={field.key} className="mb-4">
+      <Row className="g-3">
+        {fields.map((field) => (
+          <Col md={4} key={field.key}>
             <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "20px",
-                borderRadius: "10px",
-                boxShadow: "0 0 10px rgba(0,0,0,0.1)",
-                cursor: "pointer",
-              }}
+              className="mc-chart-item-card"
               onClick={() => {
                 setSelectedMetric(field.key);
                 setShowDetail(true);
               }}
             >
-              <h6 className="text-center" style={{ color: "#007bff" }}>
+              <h6 className="mc-chart-item-card__title">
                 {field.label}
               </h6>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart
                   data={mainChartData}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                  margin={{ top: 12, right: 18, left: 4, bottom: 16 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e9eff2" />
                   <XAxis
                     dataKey="timestamp"
                     type="number"
                     domain={getXAxisDomain(mainChartData)}
                     tickFormatter={(tick) =>
-                      !tick || isNaN(tick)
+                      !tick || Number.isNaN(tick)
                         ? ""
                         : new Date(tick).toLocaleDateString("id-ID", {
                             day: "2-digit",
@@ -147,24 +95,27 @@ const TrendChart = ({ data, filter = '1d' }) => {
                             minute: "2-digit",
                           })
                     }
+                    tick={{ fontSize: 11, fill: '#5a7066' }}
                   />
-                  <YAxis 
+                  <YAxis
                     domain={['dataMin - 5', 'dataMax + 10']}
                     tickCount={6}
+                    tick={{ fontSize: 11, fill: '#5a7066' }}
                   />
                   <Tooltip
                     labelFormatter={(label) =>
-                      !label || isNaN(label)
+                      !label || Number.isNaN(label)
                         ? ""
                         : new Date(label).toLocaleString("id-ID")
                     }
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
                   <Line
                     type="monotone"
                     dataKey={field.key}
-                    stroke="#007bff"
-                    activeDot={{ r: 6 }}
+                    stroke="#0f9b63"
+                    dot={false}
+                    activeDot={{ r: 5 }}
                     strokeWidth={2}
                   />
                 </LineChart>
@@ -174,11 +125,10 @@ const TrendChart = ({ data, filter = '1d' }) => {
         ))}
       </Row>
 
-      {/* Modal Detail Chart */}
       <Modal show={showDetail} onHide={() => setShowDetail(false)} size="lg" centered>
         <Modal.Header closeButton>
           <Modal.Title>
-            {FIELD_CONFIG.find(f => f.key === selectedMetric)?.label || "Detail"}
+            {fields.find((f) => f.key === selectedMetric)?.label || "Detail"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -187,13 +137,13 @@ const TrendChart = ({ data, filter = '1d' }) => {
               variant={interval === 15 ? "primary" : "outline-primary"}
               onClick={() => setInterval(15)}
             >
-              15 Minutes
+              15 Menit
             </Button>
             <Button
               variant={interval === 30 ? "primary" : "outline-primary"}
               onClick={() => setInterval(30)}
             >
-              30 Minutes
+              30 Menit
             </Button>
           </ButtonGroup>
 
@@ -208,7 +158,7 @@ const TrendChart = ({ data, filter = '1d' }) => {
                 type="number"
                 domain={getXAxisDomain(filterDataByInterval(interval))}
                 tickFormatter={(tick) =>
-                  !tick || isNaN(tick)
+                  !tick || Number.isNaN(tick)
                     ? ""
                     : new Date(tick).toLocaleTimeString("id-ID", {
                         hour: "2-digit",
@@ -222,7 +172,7 @@ const TrendChart = ({ data, filter = '1d' }) => {
               />
               <Tooltip
                 labelFormatter={(label) =>
-                  !label || isNaN(label)
+                  !label || Number.isNaN(label)
                     ? ""
                     : new Date(label).toLocaleString("id-ID")
                 }
@@ -232,6 +182,7 @@ const TrendChart = ({ data, filter = '1d' }) => {
                 type="monotone"
                 dataKey={selectedMetric}
                 stroke="#007bff"
+                dot={false}
                 activeDot={{ r: 6 }}
                 strokeWidth={2}
               />

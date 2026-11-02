@@ -3,6 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 jest.mock('react-gauge-chart', () => () => <div data-testid="mock-gauge" />);
+jest.mock('recharts', () => {
+  const OriginalModule = jest.requireActual('recharts');
+  return {
+    ...OriginalModule,
+    ResponsiveContainer: ({ children }) => <div data-testid="mock-responsive-container">{children}</div>,
+  };
+});
+import PetengoranStation2 from './components/petengoran/Station2';
 import LoginModal from './features/auth/LoginModal';
 import DashboardLinksPanel from './features/dashboard-links/DashboardLinksPanel';
 import EndpointConfigPanel from './features/endpoint-config/EndpointConfigPanel';
@@ -450,5 +458,90 @@ describe('Integrasi Frontend v2 dengan User Backend & Konsistensi UI', () => {
     });
 
     expect(screen.getByText('Publik')).toBeInTheDocument();
+  });
+
+  test('Dashboard Non-Login (Petengoran Station 2) mendukung 3 mode: Realtime, Terakhir Aktif, dan Simulasi dengan benar', async () => {
+    // Buat timestamp data terakhir aktif 10 hari yang lalu (di luar rentang 24 jam hari ini)
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    const tenDaysAgoIso = tenDaysAgo.toISOString();
+
+    global.fetch = jest.fn((url) => {
+      if (url.includes('/simulate/')) {
+        // Simulasikan endpoint simulasi backend sedang mati untuk menguji fallback generator lokal
+        return Promise.reject(new Error('Simulation backend offline'));
+      }
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          result: [
+            {
+              timestamp: tenDaysAgoIso,
+              humidity: 82.5,
+              temperature: 29.3,
+              rainfall: 1.4,
+              windSpeed: 6.8,
+              pyrano: 540,
+              direction: 'Utara',
+              angle: 15,
+              // Sengaja kosongkan bmpTemperature untuk menguji ketahanan terhadap sensor sekunder null
+              bmpTemperature: null,
+              AirPressure: 1010.2,
+            },
+          ],
+        }),
+      });
+    });
+
+    render(<PetengoranStation2 />);
+
+    const realtimeBtn = screen.getByRole('button', { name: /Mode Realtime/i });
+    const lastActiveBtn = screen.getByRole('button', { name: /Mode Terakhir Aktif/i });
+    const simBtn = screen.getByRole('button', { name: /Mode Simulasi/i });
+
+    // Tunggu sampai data riwayat dari 10 hari lalu selesai dimuat
+    await waitFor(() => {
+      expect(lastActiveBtn).not.toBeDisabled();
+    });
+
+    // 1. Pada Mode Realtime (default): karena data berusia 10 hari, tidak ada data hari ini
+    expect(screen.getByText('Realtime')).toBeInTheDocument();
+    expect(screen.getByText(/No data available for the selected filter/i)).toBeInTheDocument();
+    expect(screen.getByText('0%')).toBeInTheDocument();
+
+    // 2. Pindah ke Mode Terakhir Aktif: Gauge DAN Tabel harus menampilkan data 10 hari lalu (bukan kosong)
+    fireEvent.click(lastActiveBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Terakhir Aktif')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('82.5%')).toBeInTheDocument();
+    expect(screen.getByText('29.3°C')).toBeInTheDocument();
+    expect(screen.queryByText(/No data available for the selected filter/i)).not.toBeInTheDocument();
+    expect(screen.getByText('North')).toBeInTheDocument();
+
+    // 3. Pindah ke Mode Simulasi: menghasilkan data simulasi penuh meskipun endpoint /simulate offline
+    fireEvent.click(simBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Simulasi')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/No data available for the selected filter/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mode Simulasi ON/i })).toBeInTheDocument();
+
+    // 4. Dari Mode Simulasi bisa langsung kembali ke Mode Terakhir Aktif atau Mode Realtime
+    fireEvent.click(lastActiveBtn);
+    await waitFor(() => {
+      expect(screen.getByText('Terakhir Aktif')).toBeInTheDocument();
+    });
+    expect(screen.getByText('82.5%')).toBeInTheDocument();
+
+    fireEvent.click(realtimeBtn);
+    await waitFor(() => {
+      expect(screen.getByText('Realtime')).toBeInTheDocument();
+    });
   });
 });

@@ -94,7 +94,7 @@ const EndpointConfigPanel = () => {
         const parsed = JSON.parse(savedConfigs);
         setConfigs(parsed);
       } catch (error) {
-        setStatus({ type: 'warning', message: 'Simulasi: data konfigurasi tidak terbaca.' });
+        setStatus({ type: 'warning', message: 'Data konfigurasi lokal tidak dapat dibaca.' });
       }
     }
     if (savedActive) {
@@ -113,8 +113,13 @@ const EndpointConfigPanel = () => {
             localStorage.setItem(ACTIVE_KEY, activeConfig.id);
           }
         })
-        .catch(() => {
-          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Menampilkan data lokal.' });
+        .catch((error) => {
+          setStatus({
+            type: 'warning',
+            message: error?.isUnauthorized
+              ? 'Sesi login telah berakhir. Menampilkan konfigurasi lokal.'
+              : 'Server user belum dapat dihubungi. Menampilkan konfigurasi lokal.',
+          });
         });
     }
   }, []);
@@ -153,13 +158,13 @@ const EndpointConfigPanel = () => {
   const handleAddNew = () => {
     resetForm();
     setShowForm(true);
-    setStatus({ type: 'info', message: 'Isi form untuk membuat konfigurasi baru.' });
+    setStatus({ type: 'info', message: '' });
   };
 
   const handleCancel = () => {
     resetForm();
     setShowForm(false);
-    setStatus({ type: 'info', message: 'Kembali ke daftar konfigurasi.' });
+    setStatus({ type: 'info', message: '' });
   };
 
   const persistConfigs = (next) => {
@@ -536,13 +541,15 @@ const EndpointConfigPanel = () => {
   return (
     <Card className="shadow-sm">
       <Card.Body>
-        <Card.Title>Konfigurasi Data Source</Card.Title>
+        <Card.Title>Daftar Sumber Data</Card.Title>
         <Card.Text>
-          Pilih backend atau MQTT, lalu sesuaikan endpoint sesuai kebutuhan template.
+          Pilih koneksi REST API atau broker MQTT, lalu sesuaikan path endpoint sesuai kebutuhan template stasiun.
         </Card.Text>
-        <Alert variant={status.type || 'info'}>
-          {status.message || 'Data tersimpan di backend user v2 saat login tersedia.'}
-        </Alert>
+        {status.message && (
+          <Alert variant={status.type || 'info'}>
+            {status.message}
+          </Alert>
+        )}
         {!showForm ? (
           <div className="mt-3">{renderConfigList()}</div>
         ) : (

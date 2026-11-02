@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Container } from 'react-bootstrap';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import CustomStation2 from '../components/custom/CustomStation2';
 import { getTemplateById } from '../features/station-template/stationTemplates';
 import { fetchPublicDashboardLink } from '../features/user-dashboard/userApi';
+import '../features/user-dashboard/userDashboard.css';
 
 const STORAGE_KEY = 'mc_v2_dashboard_links';
 const UI_KEY = 'mc_v2_dashboard_link_ui';
@@ -131,76 +132,95 @@ const CustomDashboard = () => {
   }, [slug, template, username]);
 
   const isPublished = Boolean(linkData?.published);
+  const loggedInUsername = localStorage.getItem('mc_v2_username') || '';
+  const hasSession = Boolean(localStorage.getItem('mc_v2_auth_token') || loggedInUsername);
 
   if (isLoading) {
-    return null; // Or a loading spinner
+    return (
+      <div className="user-dashboard d-flex align-items-center justify-content-center" style={{ minHeight: '100vh' }}>
+        <div className="text-muted fw-semibold">Memuat konfigurasi dashboard...</div>
+      </div>
+    );
   }
 
   if (templateInfo?.id === 'station2') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div className="user-dashboard d-flex flex-column" style={{ minHeight: '100vh' }}>
+        <header className="mc-custom-topbar">
+          <Container className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div className="d-flex align-items-center gap-2">
+              <Link to="/" className="mc-custom-topbar__brand text-decoration-none">
+                Microclimate
+              </Link>
+              <span className="text-muted">/</span>
+              <span className="fw-semibold">{linkData?.name || slug}</span>
+              <Badge bg={isPublished ? 'success' : 'secondary'}>
+                {isPublished ? 'Publik' : 'Pratinjau Draft'}
+              </Badge>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+              {hasSession && (
+                <Button
+                  as={Link}
+                  to={`/${loggedInUsername || username}/dashboard/links`}
+                  variant="outline-primary"
+                  size="sm"
+                >
+                  Kelola Link
+                </Button>
+              )}
+            </div>
+          </Container>
+        </header>
         <div style={{ flex: 1 }}>
           <CustomStation2
             customConfig={configData}
-            customTitle={linkData?.name}
+            customTitle={linkData?.name || slug}
             uiSettings={uiSettings}
           />
         </div>
-        <footer 
-          style={{ 
-            textAlign: 'center', 
-            padding: '15px', 
-            backgroundColor: '#ffffff', 
-            color: '#6c757d',
-            fontSize: '0.9rem',
-            borderTop: '1px solid #dee2e6',
-            boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
-          }}
-        >
-          Dashboard ini dibuat menggunakan platform <strong>Microclimate</strong>
+        <footer className="mc-custom-footer">
+          Dashboard pemantauan iklim mikro berbasis platform <strong>Microclimate</strong>
         </footer>
       </div>
     );
   }
 
   return (
-    <Container className="py-5">
-      <Card className="shadow-sm">
-        <Card.Body>
-          <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
-            <div>
-              <Card.Title>{linkData?.name || 'Dashboard Custom'}</Card.Title>
-              <Card.Text className="text-muted">
-                Template: {templateInfo?.name || template}
-              </Card.Text>
+    <div className="user-dashboard py-5">
+      <Container>
+        <Card className="shadow-sm">
+          <Card.Body>
+            <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+              <div>
+                <Card.Title>{linkData?.name || 'Dashboard Custom'}</Card.Title>
+                <Card.Text className="text-muted">
+                  Template: {templateInfo?.name || template}
+                </Card.Text>
+              </div>
+              <Badge bg={isPublished ? 'success' : 'secondary'}>
+                {isPublished ? 'Dipublikasikan' : 'Draft'}
+              </Badge>
             </div>
-            <Badge bg={isPublished ? 'success' : 'secondary'}>
-              {isPublished ? 'Dipublikasikan' : 'Belum dipublikasikan'}
-            </Badge>
-          </div>
 
-          {!linkData && (
-            <Alert variant="warning" className="mt-3">
-              Link ini belum terdaftar di konfigurasi lokal.
-            </Alert>
-          )}
+            {!linkData && (
+              <Alert variant="warning" className="mt-3">
+                Tautan dashboard dengan slug <strong>{slug}</strong> tidak ditemukan.
+              </Alert>
+            )}
 
-          <Card.Text className="mt-3">
-            Halaman ini adalah simulasi dashboard custom untuk slug <strong>{slug}</strong>.
-            Silakan lanjutkan integrasi data sesuai template.
-          </Card.Text>
-
-          <div className="d-flex gap-2 mt-4">
-            <Button variant="outline-secondary" onClick={() => navigate(-1)}>
-              Kembali
-            </Button>
-            <Button variant="primary" onClick={() => navigate('/')}>
-              Ke Home
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
-    </Container>
+            <div className="d-flex gap-2 mt-4">
+              <Button variant="outline-secondary" onClick={() => navigate(-1)}>
+                Kembali
+              </Button>
+              <Button variant="primary" onClick={() => navigate('/')}>
+                Ke Beranda
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+      </Container>
+    </div>
   );
 };
 

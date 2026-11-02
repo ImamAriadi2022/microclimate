@@ -7,7 +7,7 @@ import { getAuthToken, savePassword as savePasswordApi } from './userApi';
 const ChangePasswordPage = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [status, setStatus] = useState({ type: 'info', message: 'Gunakan kata sandi baru minimal 8 karakter.' });
+  const [status, setStatus] = useState({ type: 'info', message: '' });
   const [showSuccess, setShowSuccess] = useState(false);
 
   const savePassword = async (event) => {
@@ -50,7 +50,7 @@ const ChangePasswordPage = () => {
         </div>
       </div>
 
-      <Alert variant={status.type}>{status.message}</Alert>
+      {status.message && <Alert variant={status.type}>{status.message}</Alert>}
 
       <form className="account-form account-form--narrow" onSubmit={savePassword}>
         <Form.Group className="mb-3" controlId="newPassword">

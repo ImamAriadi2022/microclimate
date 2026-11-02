@@ -1,9 +1,9 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Col, Form, Row } from 'react-bootstrap';
 import { FiCamera, FiSave } from 'react-icons/fi';
 import { useNavigate, useParams } from 'react-router-dom';
 import SuccessModal from './SuccessModal';
-import { getAuthToken, saveProfile as saveProfileApi, storeUser } from './userApi';
+import { fetchMe, getAuthToken, saveProfile as saveProfileApi, storeUser } from './userApi';
 
 const ProfilePage = ({ onProfileChange }) => {
   const navigate = useNavigate();
@@ -15,11 +15,31 @@ const ProfilePage = ({ onProfileChange }) => {
   const savedPhoto = localStorage.getItem('mc_v2_profile_photo') || '';
 
   const [fullName, setFullName] = useState(savedName);
-  const [email] = useState(savedEmail);
+  const [email, setEmail] = useState(savedEmail);
   const [username, setUsername] = useState(savedUsername);
   const [photo, setPhoto] = useState(savedPhoto);
-  const [status, setStatus] = useState({ type: 'info', message: 'Lengkapi identitas profil seperti saat mendaftar.' });
+  const [status, setStatus] = useState({ type: 'info', message: '' });
   const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    let cancelled = false;
+
+    fetchMe()
+      .then((data) => {
+        if (cancelled || !data?.user) return;
+        storeUser(data.user);
+        setFullName(data.user.fullName || '');
+        setEmail(data.user.email || '');
+        setUsername(data.user.username || '');
+        setPhoto(data.user.profilePhoto || '');
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const initials = useMemo(
     () => (fullName || username || 'user').charAt(0).toUpperCase(),
@@ -101,7 +121,7 @@ const ProfilePage = ({ onProfileChange }) => {
         </div>
       </div>
 
-      <Alert variant={status.type}>{status.message}</Alert>
+      {status.message && <Alert variant={status.type}>{status.message}</Alert>}
 
       <form className="account-form" onSubmit={saveProfile}>
         <Row className="g-4">

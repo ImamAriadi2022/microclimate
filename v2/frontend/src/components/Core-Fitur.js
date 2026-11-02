@@ -3,28 +3,30 @@ import { Container } from 'react-bootstrap';
 
 const CoreFitur = () => {
   return (
-    <section className="core-features-section py-5" style={{ textAlign: 'center' }}>
+    <section id="fitur" className="core-features-section py-5" style={{ textAlign: 'center' }}>
       <Container>
         <Slide direction="down" triggerOnce>
-          {/* Elemen dengan background biru muda langit */}
           <div
             style={{
-              backgroundColor: '#87CEEB', // Warna biru muda langit
-              color: '#000', // Warna teks hitam
-              borderRadius: '15px', // Sudut tidak lancip
-              padding: '10px 20px', // Padding untuk teks
-              display: 'inline-block', // Supaya elemen tidak memenuhi lebar penuh
+              backgroundColor: '#e7f7ef',
+              color: '#08754c',
+              borderRadius: '8px',
+              padding: '6px 14px',
+              display: 'inline-block',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              letterSpacing: '0.04em',
             }}
           >
-            <h5 className="mb-0">CLIMATE FEATURES</h5>
+            FITUR UTAMA
           </div>
         </Slide>
 
         <Slide direction="up" triggerOnce>
           {/* Konten utama */}
-          <h3 className="fw-bold mt-4">Core Features of Solid</h3>
-          <p className="mt-3 core-features-text">
-            Microclimate Dashboard Monitoring System is a web-based platform designed to monitor and analyze microclimate data in real time. This system is equipped with key features such as
+          <h3 className="fw-bold mt-3">Pemantauan & Konfigurasi Stasiun Terpadu</h3>
+          <p className="mt-2 core-features-text text-muted">
+            Microclimate Monitoring System menyajikan telemetri sensor secara real-time, dilengkapi pengelolaan sumber data mandiri serta publikasi dashboard kustom untuk setiap stasiun.
           </p>
         </Slide>
       </Container>

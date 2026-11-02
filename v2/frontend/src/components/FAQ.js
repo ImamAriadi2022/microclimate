@@ -12,7 +12,7 @@ const FAQ = () => {
   };
 
   return (
-    <section className="faq-section py-5">
+    <section id="faq" className="faq-section py-5">
       <Container>
         <Row>
           {/* Bagian Kiri */}

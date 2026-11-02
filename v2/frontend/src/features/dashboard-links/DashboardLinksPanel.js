@@ -16,7 +16,13 @@ const CONFIG_KEY = 'mc_v2_user_configs';
 const ACTIVE_CONFIG_KEY = 'mc_v2_active_config_id';
 const slugPattern = /^[a-z0-9-]{3,45}$/;
 
-// We'll move buildPreviewLink inside the component to have access to username parameter
+const normalizeSlug = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 
 const DashboardLinksPanel = () => {
   const { username = 'user' } = useParams();
@@ -38,30 +44,11 @@ const DashboardLinksPanel = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) {
-      setLinks([
-        {
-          id: 'demo-1',
-          name: 'Dashboard Kebun C',
-          slug: 'kebun-c',
-          templateId: 'station2',
-          published: true,
-          configId: '',
-        },
-        {
-          id: 'demo-2',
-          name: 'Dashboard Lab 01',
-          slug: 'lab-01',
-          templateId: 'station2',
-          published: false,
-          configId: '',
-        },
-      ]);
-    } else {
+    if (saved) {
       try {
-      setLinks(JSON.parse(saved));
+        setLinks(JSON.parse(saved));
       } catch (error) {
-        setStatus({ type: 'warning', message: 'Simulasi: data link tidak terbaca.' });
+        setStatus({ type: 'warning', message: 'Data link lokal tidak dapat dibaca.' });
       }
     }
 
@@ -72,8 +59,13 @@ const DashboardLinksPanel = () => {
           setLinks(remoteLinks);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteLinks));
         })
-        .catch(() => {
-          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Menampilkan link lokal.' });
+        .catch((error) => {
+          setStatus({
+            type: 'warning',
+            message: error?.isUnauthorized
+              ? 'Sesi login telah berakhir. Menampilkan link lokal.'
+              : 'Server user belum dapat dihubungi. Menampilkan link lokal.',
+          });
         });
     }
   }, []);
@@ -85,7 +77,7 @@ const DashboardLinksPanel = () => {
       try {
         setConfigs(JSON.parse(savedConfigs));
       } catch (error) {
-        setStatus({ type: 'warning', message: 'Simulasi: konfigurasi tidak terbaca.' });
+        setStatus({ type: 'warning', message: 'Data konfigurasi lokal tidak dapat dibaca.' });
       }
     }
     if (savedActive) {
@@ -126,22 +118,19 @@ const DashboardLinksPanel = () => {
   const handleAddNew = () => {
     resetForm();
     setShowForm(true);
-    setStatus({ type: 'info', message: 'Isi form untuk membuat link baru.' });
+    setStatus({ type: 'info', message: '' });
   };
 
   const handleCancel = () => {
     resetForm();
     setShowForm(false);
-    setStatus({ type: 'info', message: 'Kembali ke daftar link.' });
+    setStatus({ type: 'info', message: '' });
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const cleanName = name.trim();
-    let cleanSlug = slug.trim().toLowerCase();
-    if (cleanSlug && !cleanSlug.endsWith('-microclimate')) {
-      cleanSlug = `${cleanSlug}-microclimate`;
-    }
+    const cleanSlug = normalizeSlug(slug);
 
     if (!cleanName) {
       setStatus({ type: 'danger', message: 'Nama dashboard wajib diisi.' });
@@ -161,12 +150,14 @@ const DashboardLinksPanel = () => {
       return;
     }
 
+    const existingLink = editingId ? links.find((item) => item.id === editingId) : null;
+
     const payload = {
       id: editingId || `${Date.now()}-${cleanSlug}`,
       name: cleanName,
       slug: cleanSlug,
       templateId,
-      published: false,
+      published: existingLink ? Boolean(existingLink.published) : false,
       configId,
     };
 
@@ -177,7 +168,7 @@ const DashboardLinksPanel = () => {
         : [saved, ...links];
 
       persistLinks(nextLinks);
-      setStatus({ type: 'success', message: 'Link dashboard disimpan ke backend user.' });
+      setStatus({ type: 'success', message: 'Link dashboard berhasil disimpan.' });
       resetForm();
       setShowForm(false);
     } catch (error) {
@@ -192,7 +183,7 @@ const DashboardLinksPanel = () => {
     setTemplateId(item.templateId || 'station2');
     setConfigId(item.configId || activeConfigId || (configs[0]?.id ?? ''));
     setShowForm(true);
-    setStatus({ type: 'info', message: 'Mode edit: ubah data lalu simpan.' });
+    setStatus({ type: 'info', message: '' });
   };
 
   const handleRemove = async (id) => {
@@ -210,12 +201,13 @@ const DashboardLinksPanel = () => {
 
   const handleCopy = async (template, itemSlug) => {
     const link = buildPreviewLink(template, itemSlug);
+    const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${link}` : link;
     if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(link);
-      setStatus({ type: 'success', message: 'Simulasi: link berhasil disalin.' });
+      await navigator.clipboard.writeText(fullUrl);
+      setStatus({ type: 'success', message: 'Tautan dashboard berhasil disalin ke clipboard.' });
       return;
     }
-    setStatus({ type: 'info', message: `Salin manual: ${link}` });
+    setStatus({ type: 'info', message: `Salin manual: ${fullUrl}` });
   };
 
   const handlePreview = (template, itemSlug) => {
@@ -323,11 +315,13 @@ const DashboardLinksPanel = () => {
   return (
     <Card className="shadow-sm">
       <Card.Body>
-        <Card.Title>Dashboard Link</Card.Title>
-        <Card.Text>Buat link dashboard custom berbasis template Microclimate</Card.Text>
-        <Alert variant={status.type || 'info'}>
-          {status.message || 'Data link tersimpan di backend user v2 saat login tersedia.'}
-        </Alert>
+        <Card.Title>Daftar Tautan Dashboard</Card.Title>
+        <Card.Text>Hubungkan template stasiun dengan sumber data dan bagikan tautan monitoring publik.</Card.Text>
+        {status.message && (
+          <Alert variant={status.type || 'info'}>
+            {status.message}
+          </Alert>
+        )}
         {!showForm ? (
           <div className="mt-2">{renderLinkList()}</div>
         ) : (

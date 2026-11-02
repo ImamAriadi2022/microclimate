@@ -294,20 +294,39 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
   const latestRequestRef = useRef(0);
 
   // Get API URL based on filter
+  const joinEndpointUrl = (baseUrl, customPath, fallbackPath) => {
+    const cleanBase = String(baseUrl || '').trim().replace(/\/$/, '');
+    const rawPath = String(customPath || fallbackPath || '').trim();
+    const cleanPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+    return `${cleanBase}${cleanPath}`;
+  };
+
   const getApiUrl = (filterType) => {
-    if (customConfig && customConfig.type === 'backend') {
-      const base = customConfig.baseUrl.replace(/\/$/, '');
-      
+    if (customConfig && customConfig.type === 'backend' && customConfig.baseUrl) {
+      const map = customConfig.endpointMap || {};
+
       // If single endpoint mode is enabled, always hit topic5History
       if (customConfig.useSingleEndpoint) {
-        return `${base}${customConfig.endpointMap?.topic5History || '/petengoran/topic5/history'}`;
+        return joinEndpointUrl(
+          customConfig.baseUrl,
+          map.topic5History,
+          '/petengoran/topic5/history'
+        );
       }
-      
+
       if (filterType === '1d' || filterType === '7d') {
-        return `${base}${customConfig.endpointMap?.station2Daily || '/petengoran/station2/history'}`;
+        return joinEndpointUrl(
+          customConfig.baseUrl,
+          map.station2Daily || map['Daily data'] || map.topic5History,
+          '/petengoran/station2/history'
+        );
       }
       if (filterType === '1m') {
-        return `${base}${customConfig.endpointMap?.station2Resample15m || '/petengoran/station2/history'}`;
+        return joinEndpointUrl(
+          customConfig.baseUrl,
+          map.station2Resample15m || map.Resample15m || map.topic5History,
+          '/petengoran/station2/history'
+        );
       }
     }
 
@@ -540,139 +559,136 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
 
 
   return (
-    <section
-      style={{
-        backgroundColor: '#f8f9fa',
-        color: '#212529',
-        minHeight: '100vh',
-        padding: '20px 0',
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+    <section className="mc-custom-station">
       <Container>
-        <Row className="mb-5">
-          <Col>
-            <h2 className="text-center" style={{ color: '#007bff' }}>
-              {customTitle ? customTitle : 'Environment Status'}
+        <div className="mc-station-header mb-4">
+          <div>
+            <span className="mc-station-header__eyebrow">Dashboard Stasiun Pemantauan</span>
+            <h2 className="mc-station-header__title">
+              {customTitle ? customTitle : 'Environment Status — Station 2'}
             </h2>
-            <p className="text-center">
-              {customTitle ? `Data collected from ${customTitle}` : 'Data collected from Station 2 (Petengoran)'}
+            <p className="mc-station-header__subtitle mb-0">
+              {customTitle
+                ? `Pemantauan parameter iklim mikro pada ${customTitle}`
+                : 'Pemantauan parameter iklim mikro dari Station 2 (Petengoran)'}
             </p>
-            <div className="text-center mb-3">
-              {error && (
-                <div className="alert alert-danger" role="alert">
-                  <strong>Error:</strong> {error}
-                </div>
-              )}
-            </div>
-          </Col>
-        </Row>
-        <Row className="mt-3 mb-2">
-          <Col className="text-center">
-            <div style={{ color: '#495057', fontWeight: 600 }}>
-              Terakhir data alat aktif:{' '}
-              <span style={{ color: '#0d6efd' }}>
+          </div>
+
+          <div className="mc-station-header__meta">
+            <div className="mc-status-chip">
+              <span className="text-muted">Update terakhir:</span>{' '}
+              <strong>
                 {lastActiveTimestamp ? formatUserFriendlyTimestamp(lastActiveTimestamp) : 'Belum ada data aktif'}
-              </span>
+              </strong>
             </div>
-            <div style={{ color: '#495057', fontWeight: 600 }} className="mt-1">
-              Sumber data:{' '}
-              <span style={{ color: dataSourceMode === 'simulation' ? '#fd7e14' : '#0d6efd' }}>
+            <div className="mc-status-chip">
+              <span className="text-muted">Mode sumber:</span>{' '}
+              <span className={`badge ${dataSourceMode === 'simulation' ? 'bg-warning text-dark' : 'bg-success'}`}>
                 {dataSourceMode === 'simulation' ? 'Simulasi' : 'Realtime'}
               </span>
             </div>
-            <div className="mt-2 d-inline-flex gap-2">
-              {activeUi.gauges && (
-                <>
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${gaugeMode === 'realtime' ? 'btn-primary' : 'btn-outline-primary'}`}
-                    onClick={() => setGaugeMode('realtime')}
-                  >
-                    Mode Realtime
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn btn-sm ${gaugeMode === 'last-active' ? 'btn-primary' : 'btn-outline-primary'}`}
-                    onClick={() => setGaugeMode('last-active')}
-                    disabled={!lastActiveGaugeData}
-                  >
-                    Mode Terakhir Aktif
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                className={`btn btn-sm ${dataSourceMode === 'simulation' ? 'btn-warning' : 'btn-outline-warning'}`}
-                onClick={handleSimulationToggle}
-              >
-                Simulasi {dataSourceMode === 'simulation' ? 'ON' : 'OFF'}
-              </button>
-              {activeUi.downloadButton && (
+          </div>
+        </div>
+
+        {error && (
+          <div className="alert alert-danger mb-4" role="alert">
+            <strong>Gagal memuat data sensor:</strong> {error}
+          </div>
+        )}
+
+        <div className="mc-station-toolbar mb-4">
+          <div className="d-flex flex-wrap gap-2 align-items-center">
+            {activeUi.gauges && (
+              <>
                 <button
                   type="button"
-                  className="btn btn-sm btn-success"
-                  onClick={() => setShowDownloadModal(true)}
+                  className={`btn btn-sm ${gaugeMode === 'realtime' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setGaugeMode('realtime')}
                 >
-                  Download Data
+                  Mode Realtime
                 </button>
-              )}
-            </div>
-          </Col>
-        </Row>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${gaugeMode === 'last-active' ? 'btn-primary' : 'btn-outline-primary'}`}
+                  onClick={() => setGaugeMode('last-active')}
+                  disabled={!lastActiveGaugeData}
+                >
+                  Mode Terakhir Aktif
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className={`btn btn-sm ${dataSourceMode === 'simulation' ? 'btn-warning' : 'btn-outline-secondary'}`}
+              onClick={handleSimulationToggle}
+            >
+              Simulasi {dataSourceMode === 'simulation' ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          {activeUi.downloadButton && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => setShowDownloadModal(true)}
+            >
+              Download Data
+            </button>
+          )}
+        </div>
+
         {activeUi.gauges && (
-          <Row className="g-4">
+          <Row className="g-3 mb-4">
             {activeUi.gaugeItems.humidity && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <HumidityGauge humidity={typeof gaugeData.humidity === 'number' ? gaugeData.humidity : 0} />
-                  <h5>Humidity</h5>
-                  <p>{typeof gaugeData.humidity === 'number' ? `${gaugeData.humidity}%` : gaugeData.humidity}</p>
+                  <h5 className="mc-sensor-card__title">Humidity</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.humidity === 'number' ? `${gaugeData.humidity}%` : gaugeData.humidity}</p>
                 </div>
               </Col>
             )}
             {activeUi.gaugeItems.temperature && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <TemperatureGauge temperature={typeof gaugeData.temperature === 'number' ? gaugeData.temperature : 0} />
-                  <h5>Temperature</h5>
-                  <p>{typeof gaugeData.temperature === 'number' ? `${gaugeData.temperature}°C` : gaugeData.temperature}</p>
+                  <h5 className="mc-sensor-card__title">Temperature</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.temperature === 'number' ? `${gaugeData.temperature}°C` : gaugeData.temperature}</p>
                 </div>
               </Col>
             )}
             {activeUi.gaugeItems.rainfall && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <RainfallGauge rainfall={typeof gaugeData.rainfall === 'number' ? gaugeData.rainfall : 0} />
-                  <h5>Rainfall</h5>
-                  <p>{typeof gaugeData.rainfall === 'number' ? `${gaugeData.rainfall} mm` : gaugeData.rainfall}</p>
+                  <h5 className="mc-sensor-card__title">Rainfall</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.rainfall === 'number' ? `${gaugeData.rainfall} mm` : gaugeData.rainfall}</p>
                 </div>
               </Col>
             )}
             {activeUi.gaugeItems.windspeed && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <WindSpeedGauge windspeed={typeof gaugeData.windspeed === 'number' ? gaugeData.windspeed : 0} />
-                  <h5>Wind Speed</h5>
-                  <p>{typeof gaugeData.windspeed === 'number' ? `${gaugeData.windspeed} km/h` : gaugeData.windspeed}</p>
+                  <h5 className="mc-sensor-card__title">Wind Speed</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.windspeed === 'number' ? `${gaugeData.windspeed} km/h` : gaugeData.windspeed}</p>
                 </div>
               </Col>
             )}
             {activeUi.gaugeItems.irradiation && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <IrradiationGauge irradiation={typeof gaugeData.irradiation === 'number' ? gaugeData.irradiation : 0} />
-                  <h5>Irradiation</h5>
-                  <p>{typeof gaugeData.irradiation === 'number' ? `${gaugeData.irradiation} W/m²` : gaugeData.irradiation}</p>
+                  <h5 className="mc-sensor-card__title">Irradiation</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.irradiation === 'number' ? `${gaugeData.irradiation} W/m²` : gaugeData.irradiation}</p>
                 </div>
               </Col>
             )}
             {activeUi.gaugeItems.windDirection && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)'}}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <WindDirectionGauge windDirection={gaugeData.angle} />
-                  <h5>Wind Direction</h5>
-                  <p>
+                  <h5 className="mc-sensor-card__title">Wind Direction</h5>
+                  <p className="mc-sensor-card__value">
                     {gaugeData.windDirection 
                       ? `${gaugeData.windDirection} (${gaugeData.angle}°)`
                       : gaugeData.angle}
@@ -681,176 +697,167 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
               </Col>
             )}
             {activeUi.gaugeItems.airPressure && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <AirPressureGauge airPressure={typeof gaugeData.airpressure === 'number' ? gaugeData.airpressure : 0} />
-                  <h5>Air Pressure</h5>
-                  <p>{typeof gaugeData.airpressure === 'number' ? `${gaugeData.airpressure} hPa` : gaugeData.airpressure}</p>
+                  <h5 className="mc-sensor-card__title">Air Pressure</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.airpressure === 'number' ? `${gaugeData.airpressure} hPa` : gaugeData.airpressure}</p>
                 </div>
               </Col>
             )}
             {activeUi.gaugeItems.bmpTemperature && (
-              <Col md={3} className="text-center">
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
+              <Col xs={12} sm={6} md={3}>
+                <div className="mc-sensor-card">
                   <TemperatureGauge temperature={typeof gaugeData.bmptemperature === 'number' ? gaugeData.bmptemperature : 0} />
-                  <h5>BMP Temperature</h5>
-                  <p>{typeof gaugeData.bmptemperature === 'number' ? `${gaugeData.bmptemperature}°C` : gaugeData.bmptemperature}</p>
+                  <h5 className="mc-sensor-card__title">BMP Temperature</h5>
+                  <p className="mc-sensor-card__value">{typeof gaugeData.bmptemperature === 'number' ? `${gaugeData.bmptemperature}°C` : gaugeData.bmptemperature}</p>
                 </div>
               </Col>
             )}
           </Row>
         )}
         {activeUi.filterButtons && (
-          <Row className="mt-5 mb-3">
-            <Col className="text-center">
-              <div className="d-flex flex-column align-items-center gap-2 mb-3">
-                <Form.Label className="mb-0 fw-semibold">Pilih Rentang Waktu (opsional)</Form.Label>
-                <div className="d-flex gap-2 flex-wrap justify-content-center">
-                  <Form.Control
-                    type="datetime-local"
-                    style={{ maxWidth: '280px' }}
-                    value={startDateTime}
-                    onChange={(e) => setStartDateTime(e.target.value)}
-                    placeholder="Mulai"
-                  />
-                  <Form.Control
-                    type="datetime-local"
-                    style={{ maxWidth: '280px' }}
-                    value={endDateTime}
-                    onChange={(e) => setEndDateTime(e.target.value)}
-                    placeholder="Selesai"
-                  />
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => {
-                      setStartDateTime('');
-                      setEndDateTime('');
-                    }}
-                    disabled={!startDateTime && !endDateTime}
-                  >
-                    Reset Rentang
-                  </Button>
-                </div>
+          <div className="mc-section-card mb-4">
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <span className="fw-semibold small text-muted me-1">Rentang Waktu:</span>
+                <Form.Control
+                  type="datetime-local"
+                  size="sm"
+                  style={{ maxWidth: '210px' }}
+                  value={startDateTime}
+                  onChange={(e) => setStartDateTime(e.target.value)}
+                  placeholder="Mulai"
+                />
+                <span className="text-muted small">s/d</span>
+                <Form.Control
+                  type="datetime-local"
+                  size="sm"
+                  style={{ maxWidth: '210px' }}
+                  value={endDateTime}
+                  onChange={(e) => setEndDateTime(e.target.value)}
+                  placeholder="Selesai"
+                />
+                <Button
+                  size="sm"
+                  variant="outline-secondary"
+                  onClick={() => {
+                    setStartDateTime('');
+                    setEndDateTime('');
+                  }}
+                  disabled={!startDateTime && !endDateTime}
+                >
+                  Reset
+                </Button>
               </div>
-              <ButtonGroup>
+              <ButtonGroup size="sm">
                 <Button
                   variant={filter === '1d' ? 'primary' : 'outline-primary'}
                   onClick={() => setFilter('1d')}
                 >
-                  1 Hari Terakhir
+                  1 Hari
                 </Button>
                 <Button
                   variant={filter === '7d' ? 'primary' : 'outline-primary'}
                   onClick={() => setFilter('7d')}
                 >
-                  7 Hari Terakhir
+                  7 Hari
                 </Button>
                 <Button
                   variant={filter === '1m' ? 'primary' : 'outline-primary'}
                   onClick={() => setFilter('1m')}
                 >
-                  1 Bulan Terakhir
+                  1 Bulan
                 </Button>
               </ButtonGroup>
-            </Col>
-          </Row>
+            </div>
+          </div>
         )}
         {activeUi.chart && (
-          <>
-            <Row>
-              <Col>
-                <h2 className="text-center" style={{ color: '#007bff' }}>Chart Status</h2>
-              </Col>
-            </Row>
-            <Row>
-              <Col>
-                <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)' }}>
-                    <TrendChart
-                      data={filteredData}
-                      fields={[
-                        { key: 'humidity', label: 'Humidity (%)' },
-                        { key: 'temperature', label: 'Temperature (°C)' },
-                        { key: 'rainfall', label: 'Rainfall (mm)' },
-                        { key: 'windspeed', label: 'Wind Speed (km/h)' },
-                        { key: 'irradiation', label: 'Irradiation (W/m²)' },
-                        { key: 'angle', label: 'Wind Direction (°)' },
-                        { key: 'airpressure', label: 'Air Pressure (hPa)' },
-                        { key: 'bmptemperature', label: 'BMP Temperature (°C)' },
-                      ]}
-                    />
-                </div>
-              </Col>
-            </Row>
-          </>
+          <div className="mc-section-card mb-4">
+            <h4 className="mc-section-card__title mb-3">Grafik Tren Parameter</h4>
+            <TrendChart
+              data={filteredData}
+              fields={[
+                { key: 'humidity', label: 'Humidity (%)' },
+                { key: 'temperature', label: 'Temperature (°C)' },
+                { key: 'rainfall', label: 'Rainfall (mm)' },
+                { key: 'windspeed', label: 'Wind Speed (km/h)' },
+                { key: 'irradiation', label: 'Irradiation (W/m²)' },
+                { key: 'angle', label: 'Wind Direction (°)' },
+                { key: 'airpressure', label: 'Air Pressure (hPa)' },
+                { key: 'bmptemperature', label: 'BMP Temperature (°C)' },
+              ]}
+            />
+          </div>
         )}
 
         {activeUi.table && (
-          <Row>
-            <Col>
-              <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '10px', boxShadow: '0 0 15px rgba(0, 0, 0, 0.1)', overflowX: 'auto' }}>
-                {tableData.length > 0 ? (
-                  <Table striped bordered hover variant="light" style={{ marginBottom: 0 }}>
-                    <thead>
-                      <tr>
-                        {activeUi.tableColumns.status && <th>Status</th>}
-                        {activeUi.tableColumns.timestamp && <th>Timestamp</th>}
-                        {activeUi.tableColumns.humidity && <th>Humidity (%)</th>}
-                        {activeUi.tableColumns.temperature && <th>Temperature (°C)</th>}
-                        {activeUi.tableColumns.rainfall && <th>Rainfall (mm)</th>}
-                        {activeUi.tableColumns.windspeed && <th>Wind Speed (km/h)</th>}
-                        {activeUi.tableColumns.irradiation && <th>Irradiation (W/m²)</th>}
-                        {activeUi.tableColumns.windDirection && <th>Wind Direction</th>}
-                        {activeUi.tableColumns.airPressure && <th>Air Pressure (hPa)</th>}
-                        {activeUi.tableColumns.bmpTemperature && <th>BMP Temperature (°C)</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tableData.slice(0, 10).map((item, index) => {
-                        const isLatest = index === 0;
-                        const isUsedInGauge = (
-                          item.humidity === gaugeData.humidity &&
-                          item.temperature === gaugeData.temperature &&
-                          item.rainfall === gaugeData.rainfall &&
-                          item.windspeed === gaugeData.windspeed &&
-                          item.irradiation === gaugeData.irradiation &&
-                          item.angle === gaugeData.angle &&
-                          item.airpressure === gaugeData.airpressure &&
-                          item.bmptemperature === gaugeData.bmptemperature
-                        );
-                        return (
-                          <tr key={index}>
-                            {activeUi.tableColumns.status && (
-                              <td>
-                                <div className="d-flex flex-column gap-1">
-                                  {isLatest && <span className="badge bg-primary">Latest</span>}
-                                  {isUsedInGauge && <span className="badge bg-success">Used in Gauge</span>}
-                                </div>
-                              </td>
-                            )}
-                            {activeUi.tableColumns.timestamp && (
-                              <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
-                            )}
-                            {activeUi.tableColumns.humidity && <td>{item.humidity}</td>}
-                            {activeUi.tableColumns.temperature && <td>{item.temperature}</td>}
-                            {activeUi.tableColumns.rainfall && <td>{item.rainfall}</td>}
-                            {activeUi.tableColumns.windspeed && <td>{item.windspeed}</td>}
-                            {activeUi.tableColumns.irradiation && <td>{item.irradiation}</td>}
-                            {activeUi.tableColumns.windDirection && <td>{item.windDirection}</td>}
-                            {activeUi.tableColumns.airPressure && <td>{item.airpressure}</td>}
-                            {activeUi.tableColumns.bmpTemperature && <td>{item.bmptemperature}</td>}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </Table>
-                ) : (
-                  <p className="text-center" style={{ color: '#007bff' }}>
-                    {loading ? 'Loading data...' : 'No data available for the selected filter'}
-                  </p>
-                )}
-              </div>
-            </Col>
-          </Row>
+          <div className="mc-section-card mb-4">
+            <h4 className="mc-section-card__title mb-3">Riwayat Pembacaan Sensor</h4>
+            <div style={{ overflowX: 'auto' }}>
+              {tableData.length > 0 ? (
+                <Table striped bordered hover variant="light" className="mb-0 align-middle">
+                  <thead>
+                    <tr>
+                      {activeUi.tableColumns.status && <th>Status</th>}
+                      {activeUi.tableColumns.timestamp && <th>Timestamp</th>}
+                      {activeUi.tableColumns.humidity && <th>Humidity (%)</th>}
+                      {activeUi.tableColumns.temperature && <th>Temperature (°C)</th>}
+                      {activeUi.tableColumns.rainfall && <th>Rainfall (mm)</th>}
+                      {activeUi.tableColumns.windspeed && <th>Wind Speed (km/h)</th>}
+                      {activeUi.tableColumns.irradiation && <th>Irradiation (W/m²)</th>}
+                      {activeUi.tableColumns.windDirection && <th>Wind Direction</th>}
+                      {activeUi.tableColumns.airPressure && <th>Air Pressure (hPa)</th>}
+                      {activeUi.tableColumns.bmpTemperature && <th>BMP Temperature (°C)</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableData.slice(0, 10).map((item, index) => {
+                      const isLatest = index === 0;
+                      const isUsedInGauge = (
+                        item.humidity === gaugeData.humidity &&
+                        item.temperature === gaugeData.temperature &&
+                        item.rainfall === gaugeData.rainfall &&
+                        item.windspeed === gaugeData.windspeed &&
+                        item.irradiation === gaugeData.irradiation &&
+                        item.angle === gaugeData.angle &&
+                        item.airpressure === gaugeData.airpressure &&
+                        item.bmptemperature === gaugeData.bmptemperature
+                      );
+                      return (
+                        <tr key={index}>
+                          {activeUi.tableColumns.status && (
+                            <td>
+                              <div className="d-flex flex-column gap-1">
+                                {isLatest && <span className="badge bg-primary">Latest</span>}
+                                {isUsedInGauge && <span className="badge bg-success">Used in Gauge</span>}
+                              </div>
+                            </td>
+                          )}
+                          {activeUi.tableColumns.timestamp && (
+                            <td>{formatUserFriendlyTimestamp(item.timestamp)}</td>
+                          )}
+                          {activeUi.tableColumns.humidity && <td>{item.humidity}</td>}
+                          {activeUi.tableColumns.temperature && <td>{item.temperature}</td>}
+                          {activeUi.tableColumns.rainfall && <td>{item.rainfall}</td>}
+                          {activeUi.tableColumns.windspeed && <td>{item.windspeed}</td>}
+                          {activeUi.tableColumns.irradiation && <td>{item.irradiation}</td>}
+                          {activeUi.tableColumns.windDirection && <td>{item.windDirection}</td>}
+                          {activeUi.tableColumns.airPressure && <td>{item.airpressure}</td>}
+                          {activeUi.tableColumns.bmpTemperature && <td>{item.bmptemperature}</td>}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted my-3">
+                  {loading ? 'Memuat data...' : 'Belum ada data untuk rentang waktu yang dipilih.'}
+                </p>
+              )}
+            </div>
+          </div>
         )}
 
       </Container>

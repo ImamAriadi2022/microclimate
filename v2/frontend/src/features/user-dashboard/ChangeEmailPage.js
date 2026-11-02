@@ -23,7 +23,7 @@ const ChangeEmailPage = () => {
   const savedEmail = localStorage.getItem('mc_v2_login_email') || '';
   const [oldEmail, setOldEmail] = useState(savedEmail);
   const [newEmail, setNewEmail] = useState('');
-  const [status, setStatus] = useState({ type: 'info', message: 'Masukkan email lama dan email baru untuk memperbarui akun.' });
+  const [status, setStatus] = useState({ type: 'info', message: '' });
   const [showSuccess, setShowSuccess] = useState(false);
   const [nextPath, setNextPath] = useState('');
 
@@ -85,7 +85,7 @@ const ChangeEmailPage = () => {
         </div>
       </div>
 
-      <Alert variant={status.type}>{status.message}</Alert>
+      {status.message && <Alert variant={status.type}>{status.message}</Alert>}
 
       <form className="account-form account-form--narrow" onSubmit={saveEmail}>
         <Form.Group className="mb-3" controlId="oldEmail">

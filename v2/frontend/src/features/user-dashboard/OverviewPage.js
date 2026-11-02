@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Col, Row } from 'react-bootstrap';
 import {
-  FiActivity,
   FiArrowRight,
   FiCheckCircle,
   FiDatabase,
+  FiExternalLink,
   FiLink2,
   FiSettings,
 } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
+import { getAuthToken, listDashboardLinks, listEndpointConfigs } from './userApi';
 
 const CONFIG_KEY = 'mc_v2_user_configs';
 const LINKS_KEY = 'mc_v2_dashboard_links';
@@ -24,107 +25,156 @@ const readJson = (key, fallback) => {
 };
 
 const OverviewPage = ({ basePath, displayName }) => {
-  const configs = readJson(CONFIG_KEY, []);
-  const links = readJson(LINKS_KEY, []);
-  const activeConfigId = localStorage.getItem(ACTIVE_CONFIG_KEY);
+  const [configs, setConfigs] = useState(() => readJson(CONFIG_KEY, []));
+  const [links, setLinks] = useState(() => readJson(LINKS_KEY, []));
+  const [activeConfigId, setActiveConfigId] = useState(
+    () => localStorage.getItem(ACTIVE_CONFIG_KEY) || ''
+  );
+
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    let cancelled = false;
+
+    Promise.all([
+      listEndpointConfigs().catch(() => null),
+      listDashboardLinks().catch(() => null),
+    ]).then(([configRes, linkRes]) => {
+      if (cancelled) return;
+
+      if (configRes && Array.isArray(configRes.result)) {
+        const remoteConfigs = configRes.result;
+        setConfigs(remoteConfigs);
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(remoteConfigs));
+        const active = remoteConfigs.find((item) => item.isActive);
+        if (active) {
+          setActiveConfigId(active.id);
+          localStorage.setItem(ACTIVE_CONFIG_KEY, active.id);
+        }
+      }
+
+      if (linkRes && Array.isArray(linkRes.result)) {
+        const remoteLinks = linkRes.result;
+        setLinks(remoteLinks);
+        localStorage.setItem(LINKS_KEY, JSON.stringify(remoteLinks));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeConfig = useMemo(
-    () => configs.find((item) => item.id === activeConfigId) || null,
+    () =>
+      configs.find((item) => item.isActive) ||
+      configs.find((item) => item.id === activeConfigId) ||
+      null,
     [configs, activeConfigId]
   );
 
   const publishedLinks = links.filter((item) => item.published).length;
   const draftLinks = links.length - publishedLinks;
+  const activeUsername = localStorage.getItem('mc_v2_username') || 'user';
 
   const setupSteps = [
     {
-      title: 'Data source',
+      title: '1. Konfigurasi Sumber Data',
       done: configs.length > 0,
-      detail: configs.length > 0 ? `${configs.length} konfigurasi tersimpan` : 'Belum ada konfigurasi',
+      detail:
+        configs.length > 0
+          ? `${configs.length} konfigurasi terdaftar`
+          : 'Tambahkan Base URL API atau broker MQTT',
       to: `${basePath}/endpoint`,
     },
     {
-      title: 'Link dashboard',
+      title: '2. Buat Link Dashboard',
       done: links.length > 0,
-      detail: links.length > 0 ? `${links.length} link dibuat` : 'Belum ada link',
+      detail:
+        links.length > 0
+          ? `${links.length} link dashboard dibuat`
+          : 'Hubungkan template stasiun dengan sumber data',
       to: `${basePath}/links`,
     },
     {
-      title: 'Tampilan publik',
+      title: '3. Sesuaikan Tampilan & Publikasi',
       done: publishedLinks > 0,
-      detail: publishedLinks > 0 ? `${publishedLinks} link publik` : 'Masih draft',
+      detail:
+        publishedLinks > 0
+          ? `${publishedLinks} link aktif secara publik`
+          : 'Atur komponen UI dan publikasikan link',
       to: `${basePath}/templates`,
     },
   ];
 
   return (
-    <section className="user-dashboard__page user-dashboard__page--overview">
-      <div className="overview-hero">
-        <div>
-          <Badge bg="light" text="dark" className="overview-hero__badge">
-            Ruang kerja user
-          </Badge>
-          <h1>{displayName ? `Halo, ${displayName}` : 'Dashboard User'}</h1>
-          <p>
-            Pantau kesiapan dashboard, kelola sumber data, dan bagikan link stasiun
-            dari satu tempat yang lebih ringkas.
+    <section className="user-dashboard__page">
+      <div className="d-flex align-items-start justify-content-between flex-wrap gap-3 pb-3 mb-4 border-bottom">
+        <div className="user-dashboard__page-header">
+          <h2 className="mb-1">Ringkasan Ruang Kerja{displayName ? ` — ${displayName}` : ''}</h2>
+          <p className="mb-0">
+            Kelola koneksi sumber data sensor, tautan dashboard kustom, dan status publikasi.
           </p>
         </div>
         <div className="overview-hero__actions">
-          <Button as={Link} to={`${basePath}/endpoint`} variant="light">
-            <FiSettings size={16} />
-            Atur Data
+          <Button as={Link} to={`${basePath}/endpoint`} variant="outline-primary" size="sm">
+            <FiSettings size={15} />
+            Konfigurasi Endpoint
           </Button>
-          <Button as={Link} to={`${basePath}/links`} variant="primary">
-            <FiLink2 size={16} />
-            Buat Link
+          <Button as={Link} to={`${basePath}/links`} variant="primary" size="sm">
+            <FiLink2 size={15} />
+            Buat Link Dashboard
           </Button>
         </div>
       </div>
 
-      <Row className="g-3 mt-1">
+      <Row className="g-3 mb-4">
         <Col xs={12} md={4}>
           <div className="metric-card">
-            <div className="metric-card__icon metric-card__icon--blue">
+            <div>
+              <div className="metric-card__label">Sumber Data Terdaftar</div>
+              <div className="metric-card__value">{configs.length}</div>
+            </div>
+            <div className="metric-card__icon metric-card__icon--primary">
               <FiDatabase size={20} />
             </div>
-            <div>
-              <div className="metric-card__value">{configs.length}</div>
-              <div className="metric-card__label">Data source</div>
-            </div>
           </div>
         </Col>
         <Col xs={12} md={4}>
           <div className="metric-card">
-            <div className="metric-card__icon metric-card__icon--green">
+            <div>
+              <div className="metric-card__label">Total Link Dashboard</div>
+              <div className="metric-card__value">{links.length}</div>
+            </div>
+            <div className="metric-card__icon metric-card__icon--primary">
               <FiLink2 size={20} />
             </div>
-            <div>
-              <div className="metric-card__value">{links.length}</div>
-              <div className="metric-card__label">Link dashboard</div>
-            </div>
           </div>
         </Col>
         <Col xs={12} md={4}>
           <div className="metric-card">
-            <div className="metric-card__icon metric-card__icon--amber">
-              <FiActivity size={20} />
-            </div>
             <div>
-              <div className="metric-card__value">{publishedLinks}</div>
-              <div className="metric-card__label">Link publik</div>
+              <div className="metric-card__label">Link Dipublikasikan</div>
+              <div className="metric-card__value">
+                {publishedLinks}
+                {draftLinks > 0 && (
+                  <span className="metric-card__subvalue">{draftLinks} draft</span>
+                )}
+              </div>
+            </div>
+            <div className="metric-card__icon metric-card__icon--primary">
+              <FiCheckCircle size={20} />
             </div>
           </div>
         </Col>
       </Row>
 
-      <Row className="g-4 mt-1">
+      <Row className="g-4">
         <Col xs={12} lg={7}>
-          <div className="section-panel">
+          <div className="section-panel h-100">
             <div className="section-panel__header">
               <div>
-                <h2>Langkah Berikutnya</h2>
-                <p>Selesaikan urutan ini agar dashboard bisa dipakai pengguna akhir.</p>
+                <h2>Alur Penyiapan Dashboard</h2>
+                <p>Tahapan konfigurasi hingga dashboard siap diakses pengguna.</p>
               </div>
             </div>
             <div className="setup-list">
@@ -137,53 +187,80 @@ const OverviewPage = ({ basePath, displayName }) => {
                     <strong>{step.title}</strong>
                     <span>{step.detail}</span>
                   </span>
-                  <FiArrowRight size={18} />
+                  <FiArrowRight size={16} className="text-muted" />
                 </Link>
               ))}
             </div>
           </div>
         </Col>
         <Col xs={12} lg={5}>
-          <div className="section-panel">
-            <div className="section-panel__header">
-              <div>
-                <h2>Status Aktif</h2>
-                <p>Konfigurasi yang akan dipakai link baru.</p>
+          <div className="section-panel h-100 d-flex flex-column justify-content-between">
+            <div>
+              <div className="section-panel__header">
+                <div>
+                  <h2>Sumber Data Utama</h2>
+                  <p>Konfigurasi aktif yang digunakan sebagai default link baru.</p>
+                </div>
               </div>
+              {activeConfig ? (
+                <div className="active-source">
+                  <div className="d-flex align-items-center gap-2">
+                    <Badge bg={activeConfig.type === 'backend' ? 'primary' : 'warning'}>
+                      {activeConfig.type === 'backend' ? 'REST API' : 'MQTT'}
+                    </Badge>
+                    <Badge bg="secondary">{activeConfig.templateId}</Badge>
+                  </div>
+                  <h3 className="mt-1">{activeConfig.name}</h3>
+                  <code className="d-block p-2 rounded small text-break">
+                    {activeConfig.type === 'backend'
+                      ? activeConfig.baseUrl || 'Base URL belum diisi'
+                      : activeConfig.brokerUrl || 'Broker belum diisi'}
+                  </code>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <FiDatabase size={22} />
+                  <strong>Belum ada sumber data aktif</strong>
+                  <span>Tambahkan atau aktifkan konfigurasi di menu Konfigurasi Endpoint.</span>
+                </div>
+              )}
             </div>
-            {activeConfig ? (
-              <div className="active-source">
-                <Badge bg={activeConfig.type === 'backend' ? 'primary' : 'warning'}>
-                  {activeConfig.type === 'backend' ? 'Backend' : 'MQTT'}
-                </Badge>
-                <h3>{activeConfig.name}</h3>
-                <p>
-                  {activeConfig.type === 'backend'
-                    ? activeConfig.baseUrl || 'Base URL belum diisi'
-                    : activeConfig.brokerUrl || 'Broker belum diisi'}
-                </p>
-                <Button as={Link} to={`${basePath}/endpoint`} variant="outline-primary" size="sm">
-                  Periksa konfigurasi
-                </Button>
-              </div>
-            ) : (
-              <div className="empty-state">
-                <FiDatabase size={24} />
-                <strong>Belum ada konfigurasi aktif</strong>
-                <span>Buat atau aktifkan data source agar link dashboard punya sumber data.</span>
+
+            {links.length > 0 && (
+              <div className="mt-4 pt-3 border-top">
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <span className="fw-semibold small">Tautan Terbaru</span>
+                  <Link to={`${basePath}/links`} className="small text-decoration-none">
+                    Lihat semua
+                  </Link>
+                </div>
+                <div className="d-grid gap-2">
+                  {links.slice(0, 2).map((item) => (
+                    <div
+                      key={item.id}
+                      className="d-flex align-items-center justify-content-between p-2 border rounded bg-light"
+                    >
+                      <div className="text-truncate me-2">
+                        <div className="fw-semibold small text-truncate">{item.name}</div>
+                        <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                          /{activeUsername}/{item.templateId}/{item.slug}
+                        </div>
+                      </div>
+                      <Button
+                        as={Link}
+                        to={`/${activeUsername}/${item.templateId}/${item.slug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="outline-primary"
+                        size="sm"
+                      >
+                        <FiExternalLink size={14} />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
-          <div className="section-panel mt-4">
-            <div className="section-panel__header">
-              <div>
-                <h2>Publikasi</h2>
-                <p>{draftLinks > 0 ? `${draftLinks} link masih draft.` : 'Tidak ada draft tertunda.'}</p>
-              </div>
-              <Button as={Link} to={`${basePath}/links`} variant="outline-secondary" size="sm">
-                Kelola
-              </Button>
-            </div>
           </div>
         </Col>
       </Row>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Container } from 'react-bootstrap';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import ChangeEmailPage from '../features/user-dashboard/ChangeEmailPage';
 import ChangePasswordPage from '../features/user-dashboard/ChangePasswordPage';
 import DashboardLinksPage from '../features/user-dashboard/DashboardLinksPage';
@@ -10,10 +10,12 @@ import ProfilePage from '../features/user-dashboard/ProfilePage';
 import TemplatePage from '../features/user-dashboard/TemplatePage';
 import UserNavbar from '../features/user-dashboard/UserNavbar';
 import UserSidebar from '../features/user-dashboard/UserSidebar';
+import { fetchMe, getAuthToken, storeUser } from '../features/user-dashboard/userApi';
 import '../features/user-dashboard/userDashboard.css';
 
 const UserConfig = () => {
   const { username } = useParams();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window === 'undefined') return true;
     return window.innerWidth >= 992;
@@ -24,7 +26,9 @@ const UserConfig = () => {
       localStorage.getItem('mc_v2_username') ||
       'user'
   );
-  const activeUsername = localStorage.getItem('mc_v2_username') || username || 'user';
+  const [activeUsername, setActiveUsername] = useState(
+    localStorage.getItem('mc_v2_username') || username || 'user'
+  );
   const basePath = `/${activeUsername}/dashboard`;
 
   useEffect(() => {
@@ -34,7 +38,32 @@ const UserConfig = () => {
         username ||
         'user'
     );
+    setActiveUsername(localStorage.getItem('mc_v2_username') || username || 'user');
   }, [username]);
+
+  useEffect(() => {
+    if (!getAuthToken()) return;
+    let cancelled = false;
+
+    fetchMe()
+      .then((data) => {
+        if (cancelled || !data?.user) return;
+        storeUser(data.user);
+        setDisplayName(data.user.fullName || data.user.username || 'user');
+        if (data.user.username) {
+          setActiveUsername(data.user.username);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled && error?.isUnauthorized) {
+          navigate('/');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const handleToggleSidebar = () => {
     setIsSidebarOpen((prev) => !prev);

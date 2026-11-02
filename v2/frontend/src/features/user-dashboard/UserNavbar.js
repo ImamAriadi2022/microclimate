@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Container, Dropdown, Navbar } from 'react-bootstrap';
 import { FiMenu } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { clearAuthSession } from './userApi';
 
 const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
@@ -13,9 +13,6 @@ const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
 
   const handleLogout = () => {
     clearAuthSession();
-    localStorage.removeItem('mc_v2_login_email');
-    localStorage.removeItem('mc_v2_username');
-    localStorage.removeItem('mc_v2_display_name');
     navigate('/');
   };
 
@@ -31,7 +28,9 @@ const UserNavbar = ({ username, isSidebarOpen, onToggleSidebar }) => {
           >
             <FiMenu size={18} />
           </button>
-          <Navbar.Brand className="user-navbar__brand">Microclimate</Navbar.Brand>
+          <Navbar.Brand as={Link} to="/" className="user-navbar__brand text-decoration-none">
+            Microclimate <span className="user-navbar__brand-tag">Workspace</span>
+          </Navbar.Brand>
         </div>
         <Dropdown align="end">
           <Dropdown.Toggle

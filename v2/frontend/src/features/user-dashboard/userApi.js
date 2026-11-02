@@ -21,14 +21,20 @@ const storeAuthSession = ({ token, user }) => {
 
 const clearAuthSession = () => {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('mc_v2_login_email');
+  localStorage.removeItem('mc_v2_username');
+  localStorage.removeItem('mc_v2_display_name');
+  localStorage.removeItem('mc_v2_profile_photo');
+  localStorage.removeItem('mc_v2_password');
 };
 
 const apiRequest = async (path, options = {}) => {
+  const token = getAuthToken();
   const headers = {
     Accept: 'application/json',
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.auth !== false && getAuthToken()
-      ? { Authorization: `Bearer ${getAuthToken()}` }
+    ...(options.auth !== false && token
+      ? { Authorization: `Bearer ${token}` }
       : {}),
     ...(options.headers || {}),
   };
@@ -48,6 +54,10 @@ const apiRequest = async (path, options = {}) => {
   if (!response.ok) {
     const error = new Error(data.message || `HTTP ${response.status}`);
     error.status = response.status;
+    if (response.status === 401 && options.auth !== false) {
+      error.isUnauthorized = true;
+      localStorage.removeItem(TOKEN_KEY);
+    }
     throw error;
   }
 
@@ -59,6 +69,8 @@ const registerAccount = (payload) =>
 
 const loginAccount = (payload) =>
   apiRequest('/auth/login', { method: 'POST', body: payload, auth: false });
+
+const fetchMe = () => apiRequest('/me');
 
 const saveProfile = (payload) =>
   apiRequest('/me/profile', { method: 'PATCH', body: payload });
@@ -108,6 +120,7 @@ export {
   clearAuthSession,
   deleteDashboardLink,
   deleteEndpointConfig,
+  fetchMe,
   fetchPublicDashboardLink,
   getAuthToken,
   listDashboardLinks,

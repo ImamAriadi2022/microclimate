@@ -78,7 +78,7 @@ const TemplatePage = () => {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [status, setStatus] = useState({
     type: 'info',
-    message: 'Pilih link, ubah tampilan, lalu tekan Simpan Tampilan.',
+    message: '',
   });
 
   useEffect(() => {
@@ -228,10 +228,10 @@ const TemplatePage = () => {
   return (
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
-        <h2>Template microclimate</h2>
-        <p>Kelola dashboard custom: pilih link, edit tampilan, dan lihat preview.</p>
+        <h2>Editor Tampilan Dashboard</h2>
+        <p>Sesuaikan visibilitas kartu gauge, grafik tren, dan kolom tabel untuk setiap link dashboard.</p>
       </div>
-      <Alert variant={status.type}>{status.message}</Alert>
+      {status.message && <Alert variant={status.type}>{status.message}</Alert>}
       <Row className="g-4">
         <Col xs={12} lg={4}>
           <Card className="shadow-sm h-100">
@@ -323,13 +323,6 @@ const TemplatePage = () => {
                           checked={activeUi.chart}
                           onChange={() => handleToggle('chart')}
                         />
-                        <Form.Check
-                          type="switch"
-                          id="toggle-map"
-                          label="Map"
-                          checked={activeUi.map}
-                          onChange={() => handleToggle('map')}
-                        />
                       </div>
                     </Col>
                     <Col xs={12} md={6}>
@@ -378,27 +371,42 @@ const TemplatePage = () => {
           </Card>
           <Card className="shadow-sm mt-4">
             <Card.Body>
-              <Card.Title>Preview Dashboard (Mock)</Card.Title>
-              <Card.Text>
-                Tampilan ini hanya mock untuk melihat layout.
-              </Card.Text>
+              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div>
+                  <Card.Title className="mb-1">Pratinjau Tata Letak</Card.Title>
+                  <Card.Text className="mb-0">
+                    Representasi susunan komponen yang akan tampil pada halaman dashboard publik.
+                  </Card.Text>
+                </div>
+                {selectedLink && (
+                  <Button
+                    size="sm"
+                    variant="outline-primary"
+                    href={buildPreviewLink(selectedLink.templateId, selectedLink.slug)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Buka Halaman Dashboard
+                  </Button>
+                )}
+              </div>
               {!selectedLink ? (
-                <div className="text-muted">Pilih link untuk melihat preview.</div>
+                <div className="text-muted">Pilih link untuk melihat pratinjau tata letak.</div>
               ) : (
-                <div className="template-preview">
+                <div className="template-preview mt-3">
                   <div className="template-preview__header">
                     <div>
                       <div className="template-preview__title">{selectedLink.name}</div>
                       <div className="template-preview__subtitle">
-                        {stationTemplates.find((t) => t.id === selectedLink.templateId)?.name || 'Station2'}
+                        {stationTemplates.find((t) => t.id === selectedLink.templateId)?.name || 'Station 2'}
                       </div>
                     </div>
                     <Stack direction="horizontal" gap={2} className="flex-wrap">
                       {activeUi.filterButtons && (
-                        <Button size="sm" variant="outline-primary">Filter</Button>
+                        <Button size="sm" variant="outline-primary">Filter Rentang</Button>
                       )}
                       {activeUi.downloadButton && (
-                        <Button size="sm" variant="primary">Download</Button>
+                        <Button size="sm" variant="primary">Download Data</Button>
                       )}
                     </Stack>
                   </div>
@@ -416,12 +424,6 @@ const TemplatePage = () => {
                     <div className="template-preview__panel">
                       <div className="template-preview__panel-title">Chart Time Series</div>
                       <div className="template-preview__chart" />
-                    </div>
-                  )}
-                  {activeUi.map && (
-                    <div className="template-preview__panel">
-                      <div className="template-preview__panel-title">Map</div>
-                      <div className="template-preview__map" />
                     </div>
                   )}
                   {activeUi.table && (

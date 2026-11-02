@@ -4,32 +4,32 @@ import { FaBell, FaChartLine, FaCogs, FaDatabase, FaDesktop, FaFileExport } from
 
 const features = [
   {
-    icon: <FaDesktop size={40} color="#007bff" />,
+    icon: <FaDesktop size={36} color="#0f9b63" />,
     title: 'Responsive Dashboard',
     description: 'Features a user-friendly and responsive interface, enabling seamless access across all devices, including desktops, tablets, and mobile phones.',
   },
   {
-    icon: <FaDatabase size={40} color="#007bff" />,
+    icon: <FaDatabase size={36} color="#0f9b63" />,
     title: 'Historical Data Storage and Access',
     description: 'Provides access to historical climate data for trend analysis, weather prediction, and data-driven planning.',
   },
   {
-    icon: <FaBell size={40} color="#007bff" />,
+    icon: <FaBell size={36} color="#0f9b63" />,
     title: 'Automated Alert System',
     description: 'Sends instant notifications to users when extreme weather conditions occur or microclimate parameters exceed predefined thresholds.',
   },
   {
-    icon: <FaCogs size={40} color="#007bff" />,
+    icon: <FaCogs size={36} color="#0f9b63" />,
     title: 'Sensor Integration',
     description: 'Connects to various field sensors to gather accurate and up-to-date microclimate data.',
   },
   {
-    icon: <FaFileExport size={40} color="#007bff" />,
+    icon: <FaFileExport size={36} color="#0f9b63" />,
     title: 'Data Export and Download',
     description: 'Allows users to export data in various formats, such as CSV or excel, for further analysis or reporting.',
   },
   {
-    icon: <FaChartLine size={40} color="#007bff" />,
+    icon: <FaChartLine size={36} color="#0f9b63" />,
     title: 'Real-Time Data Monitoring',
     description: 'Displays microclimate parameters such as temperature, humidity, rainfall, wind speed, and wind direction in real time through interactive charts and visualizations.',
   },

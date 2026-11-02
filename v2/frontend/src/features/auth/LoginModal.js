@@ -39,6 +39,10 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
       setStatus({ type: 'danger', message: 'Nama lengkap wajib diisi.' });
       return;
     }
+    if (mode === 'register' && password.length < 8) {
+      setStatus({ type: 'danger', message: 'Password minimal 8 karakter.' });
+      return;
+    }
     if (mode === 'register' && password !== confirmPassword) {
       setStatus({ type: 'danger', message: 'Konfirmasi password tidak sama.' });
       return;
@@ -57,11 +61,11 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
         type: 'success',
         message:
           mode === 'register'
-            ? 'Daftar berhasil. Mengarah ke dashboard user.'
-            : 'Login berhasil. Mengarah ke dashboard user.',
+            ? 'Pendaftaran berhasil. Mengarahkan ke dashboard...'
+            : 'Login berhasil. Mengarahkan ke dashboard...',
       });
       onHide();
-      navigate(`/${username}/dashboard/endpoint`);
+      navigate(`/${username}/dashboard`);
     } catch (error) {
       if (!error.status) {
         const username = buildUsername(email.trim());
@@ -69,37 +73,43 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
         localStorage.setItem('mc_v2_login_email', email.trim());
         localStorage.setItem('mc_v2_username', username);
         localStorage.setItem('mc_v2_display_name', displayName);
-        if (mode === 'register') {
-          localStorage.setItem('mc_v2_password', password);
-        }
-        setStatus({ type: 'warning', message: 'Backend login belum tersedia. Memakai mode lokal sementara.' });
+        setStatus({ type: 'warning', message: 'Server autentikasi belum terhubung. Masuk dalam mode lokal.' });
         onHide();
-        navigate(`/${username}/dashboard/endpoint`);
+        navigate(`/${username}/dashboard`);
         return;
       }
 
-      setStatus({ type: 'danger', message: error.message || 'Login gagal.' });
+      setStatus({ type: 'danger', message: error.message || 'Autentikasi gagal.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal show={show} onHide={onHide} centered>
+    <Modal show={show} onHide={onHide} centered className="mc-auth-modal">
       <Modal.Header closeButton>
-        <Modal.Title>{mode === 'register' ? 'Daftar' : 'Masuk'}</Modal.Title>
+        <div>
+          <Modal.Title>{mode === 'register' ? 'Buat Akun Baru' : 'Masuk ke Microclimate'}</Modal.Title>
+          <div className="text-muted small mt-1">
+            {mode === 'register'
+              ? 'Daftarkan akun untuk mengelola sumber data dan membuat dashboard custom.'
+              : 'Masuk untuk mengakses konfigurasi stasiun dan link dashboard Anda.'}
+          </div>
+        </div>
       </Modal.Header>
       <Modal.Body>
-        <Alert variant={status.type || 'info'}>
-          {status.message || 'Login terhubung ke backend user v2.'}
-        </Alert>
+        {status.message && (
+          <Alert variant={status.type || 'info'} className="py-2 small">
+            {status.message}
+          </Alert>
+        )}
         <Form onSubmit={handleSubmit}>
           {mode === 'register' && (
             <Form.Group className="mb-3" controlId="registerName">
               <Form.Label>Nama Lengkap</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="Nama lengkap"
+                placeholder="Masukkan nama lengkap"
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
                 autoComplete="name"
@@ -120,10 +130,10 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
             <Form.Label>Password</Form.Label>
             <Form.Control
               type="password"
-              placeholder="Masukkan password"
+              placeholder={mode === 'register' ? 'Minimal 8 karakter' : 'Masukkan password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
+              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
             />
           </Form.Group>
           {mode === 'register' && (
@@ -138,23 +148,21 @@ const LoginModal = ({ show, onHide, initialMode = 'login' }) => {
               />
             </Form.Group>
           )}
-          <Form.Check
-            type="checkbox"
-            className="mb-3"
-            label="Ingat saya di perangkat ini"
-          />
-          <Button type="submit" variant="primary" className="w-100" disabled={isSubmitting}>
-            {isSubmitting ? 'Memproses...' : mode === 'register' ? 'Daftar' : 'Login'}
+          <Button type="submit" variant="primary" className="w-100 mt-1" disabled={isSubmitting}>
+            {isSubmitting ? 'Memproses...' : mode === 'register' ? 'Daftar Akun' : 'Masuk'}
           </Button>
         </Form>
-        <div className="text-center mt-3">
+        <div className="text-center mt-3 small">
           {mode === 'register' ? 'Sudah punya akun?' : 'Belum punya akun?'}{' '}
           <Button
             variant="link"
-            className="p-0"
-            onClick={() => setMode(mode === 'register' ? 'login' : 'register')}
+            className="p-0 fw-semibold text-decoration-none"
+            onClick={() => {
+              setMode(mode === 'register' ? 'login' : 'register');
+              setStatus({ type: 'info', message: '' });
+            }}
           >
-            {mode === 'register' ? 'Masuk' : 'Daftar'}
+            {mode === 'register' ? 'Masuk di sini' : 'Daftar sekarang'}
           </Button>
         </div>
       </Modal.Body>

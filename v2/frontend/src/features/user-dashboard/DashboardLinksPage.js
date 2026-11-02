@@ -4,8 +4,8 @@ const DashboardLinksPage = () => {
   return (
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
-        <h2>Dashboard Link</h2>
-        <p>Buat dan kelola link dashboard custom berbasis microclimate.</p>
+        <h2>Halaman & Link Dashboard</h2>
+        <p>Buat tautan halaman dashboard untuk stasiun Anda dan bagikan akses pantauannya ke publik.</p>
       </div>
       <DashboardLinksPanel />
     </section>

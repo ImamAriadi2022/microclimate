@@ -458,6 +458,9 @@ describe('Integrasi Frontend v2 dengan User Backend & Konsistensi UI', () => {
     });
 
     expect(screen.getByText('Publik')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mode Realtime/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mode Terakhir Aktif/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mode Simulasi/i })).not.toBeInTheDocument();
   });
 
   test('Dashboard Non-Login (Petengoran Station 2) mendukung 3 mode: Realtime, Terakhir Aktif, dan Simulasi dengan benar', async () => {
@@ -543,5 +546,27 @@ describe('Integrasi Frontend v2 dengan User Backend & Konsistensi UI', () => {
     await waitFor(() => {
       expect(screen.getByText('Realtime')).toBeInTheDocument();
     });
+  });
+
+  test('EndpointConfigPanel menyajikan UX ramah pengguna tanpa istilah internal Topic 5 / Station 2 dan mendukung pemisahan URL otomatis', async () => {
+    render(<EndpointConfigPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Hubungkan Sumber Data Pertama/i }));
+
+    // Pastikan istilah internal proyek sudah digantikan dengan bahasa produk yang ramah pengguna
+    expect(screen.queryByText(/Topic 5 History/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Station 2 — Microclimate Lengkap/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Stasiun Cuaca & Iklim Lengkap \(Maks\. 8 Sensor\)/i)).toBeInTheDocument();
+
+    // Ketika pengguna menempelkan URL lengkap ke Alamat Server API, otomatis memisahkan origin dan path
+    const baseUrlInput = screen.getByLabelText(/Alamat Server API/i);
+    fireEvent.change(baseUrlInput, {
+      target: { value: 'https://api-sensor.contoh.id/v1/telemetry' },
+    });
+    fireEvent.blur(baseUrlInput);
+
+    expect(baseUrlInput.value).toBe('https://api-sensor.contoh.id');
+    const pathInput = screen.getByLabelText(/Path Endpoint Data Sensor/i);
+    expect(pathInput.value).toBe('/v1/telemetry');
   });
 });

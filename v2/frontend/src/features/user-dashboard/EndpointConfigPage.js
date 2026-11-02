@@ -4,8 +4,8 @@ const EndpointConfigPage = () => {
   return (
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
-        <h2>Konfigurasi Data Source</h2>
-        <p>Kelola beberapa konfigurasi backend atau MQTT untuk dashboard custom.</p>
+        <h2>Sumber Data Sensor</h2>
+        <p>Hubungkan API atau broker MQTT dari perangkat sensor Anda agar dapat ditampilkan di halaman dashboard.</p>
       </div>
       <EndpointConfigPanel />
     </section>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Stack } from 'react-bootstrap';
 import { useParams } from 'react-router-dom';
-import { stationTemplates } from '../station-template/stationTemplates';
+import { getTemplateDisplayName } from '../station-template/stationTemplates';
 import { getAuthToken, listDashboardLinks, saveDashboardLinkUi } from './userApi';
 
 const LINKS_KEY = 'mc_v2_dashboard_links';
@@ -38,27 +38,27 @@ const DEFAULT_UI = {
 };
 
 const GAUGE_OPTIONS = [
-  { key: 'humidity', label: 'Humidity' },
-  { key: 'temperature', label: 'Temperature' },
-  { key: 'rainfall', label: 'Rainfall' },
-  { key: 'windspeed', label: 'Wind Speed' },
-  { key: 'irradiation', label: 'Irradiation' },
-  { key: 'windDirection', label: 'Wind Direction' },
-  { key: 'airPressure', label: 'Air Pressure' },
-  { key: 'bmpTemperature', label: 'BMP Temperature' },
+  { key: 'humidity', label: 'Kelembaban Udara (Humidity)' },
+  { key: 'temperature', label: 'Suhu Udara (Temperature)' },
+  { key: 'rainfall', label: 'Curah Hujan (Rainfall)' },
+  { key: 'windspeed', label: 'Kecepatan Angin (Wind Speed)' },
+  { key: 'irradiation', label: 'Radiasi Matahari (Irradiation)' },
+  { key: 'windDirection', label: 'Arah Angin (Wind Direction)' },
+  { key: 'airPressure', label: 'Tekanan Udara (Air Pressure)' },
+  { key: 'bmpTemperature', label: 'Suhu Alat / Cadangan (BMP Temperature)' },
 ];
 
 const TABLE_COLUMNS = [
-  { key: 'status', label: 'Status' },
-  { key: 'timestamp', label: 'Timestamp' },
-  { key: 'humidity', label: 'Humidity (%)' },
-  { key: 'temperature', label: 'Temperature (°C)' },
-  { key: 'rainfall', label: 'Rainfall (mm)' },
-  { key: 'windspeed', label: 'Wind Speed (km/h)' },
-  { key: 'irradiation', label: 'Irradiation (W/m²)' },
-  { key: 'windDirection', label: 'Wind Direction' },
-  { key: 'airPressure', label: 'Air Pressure (hPa)' },
-  { key: 'bmpTemperature', label: 'BMP Temperature (°C)' },
+  { key: 'status', label: 'Penanda Data Terbaru (Status)' },
+  { key: 'timestamp', label: 'Waktu Pencatatan (Timestamp)' },
+  { key: 'humidity', label: 'Kelembaban Udara (%)' },
+  { key: 'temperature', label: 'Suhu Udara (°C)' },
+  { key: 'rainfall', label: 'Curah Hujan (mm)' },
+  { key: 'windspeed', label: 'Kecepatan Angin (km/h)' },
+  { key: 'irradiation', label: 'Radiasi Matahari (W/m²)' },
+  { key: 'windDirection', label: 'Arah Angin' },
+  { key: 'airPressure', label: 'Tekanan Udara (hPa)' },
+  { key: 'bmpTemperature', label: 'Suhu Alat / Cadangan (°C)' },
 ];
 
 const readUiSettingsFromLinks = (items) =>
@@ -117,7 +117,7 @@ const TemplatePage = () => {
           localStorage.setItem(LINKS_KEY, JSON.stringify(remoteLinks));
         })
         .catch(() => {
-          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Editor memakai data lokal.' });
+          setStatus({ type: 'warning', message: 'Backend user belum dapat dihubungi. Pengaturan memakai data lokal.' });
         });
     }
   }, []);
@@ -149,7 +149,7 @@ const TemplatePage = () => {
   const updateUi = (next) => {
     setUiSettings(next);
     setHasUnsavedChanges(true);
-    setStatus({ type: 'warning', message: 'Perubahan tampilan belum disimpan.' });
+    setStatus({ type: 'warning', message: 'Ada perubahan tampilan yang belum disimpan.' });
   };
 
   const handleToggle = (key) => {
@@ -217,7 +217,7 @@ const TemplatePage = () => {
       setHasUnsavedChanges(false);
       setStatus({
         type: 'success',
-        message: 'Tampilan dashboard berhasil disimpan. Link dashboard akan memakai setelan terbaru.',
+        message: 'Tampilan dashboard berhasil disimpan.',
       });
     } catch (error) {
       setStatus({ type: 'danger', message: error.message || 'Tampilan dashboard gagal disimpan.' });
@@ -228,19 +228,19 @@ const TemplatePage = () => {
   return (
     <section className="user-dashboard__page">
       <div className="user-dashboard__page-header">
-        <h2>Editor Tampilan Dashboard</h2>
-        <p>Sesuaikan visibilitas kartu gauge, grafik tren, dan kolom tabel untuk setiap link dashboard.</p>
+        <h2>Atur Tampilan & Sensor Dashboard</h2>
+        <p>Pilih sensor apa saja yang dimiliki alat Anda dan sesuaikan komponen yang ingin ditampilkan pada halaman publik.</p>
       </div>
       {status.message && <Alert variant={status.type}>{status.message}</Alert>}
       <Row className="g-4">
         <Col xs={12} lg={4}>
           <Card className="shadow-sm h-100">
             <Card.Body>
-              <Card.Title>Link Dashboard</Card.Title>
-              <Card.Text>Pilih link yang ingin kamu edit tampilannya.</Card.Text>
+              <Card.Title>Pilih Halaman Dashboard</Card.Title>
+              <Card.Text>Klik salah satu halaman di bawah untuk mengatur sensor yang tampil.</Card.Text>
               {!hasLinks ? (
                 <div className="text-muted">
-                  Belum ada link. Buat link baru di menu Dashboard Link.
+                  Belum ada halaman dashboard. Silakan buat terlebih dahulu di menu Link Dashboard.
                 </div>
               ) : (
                 <ListGroup variant="flush">
@@ -273,24 +273,24 @@ const TemplatePage = () => {
             <Card.Body>
               <div className="d-flex align-items-start justify-content-between flex-wrap gap-2">
                 <div>
-                  <Card.Title>Editor Tampilan</Card.Title>
+                  <Card.Title>Komponen & Parameter Sensor</Card.Title>
                   <Card.Text className="mb-0">
-                    Atur elemen dashboard yang ingin ditampilkan.
+                    Matikan sensor yang tidak dimiliki oleh perangkat Anda agar halaman dashboard terlihat bersih.
                   </Card.Text>
                 </div>
                 <Stack direction="horizontal" gap={2} className="flex-wrap">
-                  {hasUnsavedChanges && <Badge bg="warning">Belum disimpan</Badge>}
+                  {hasUnsavedChanges && <Badge bg="warning" text="dark">Belum disimpan</Badge>}
                   <Button size="sm" variant="primary" onClick={handleSaveUi} disabled={!selectedLink || !hasUnsavedChanges}>
                     Simpan Tampilan
                   </Button>
                   <Button size="sm" variant="outline-secondary" onClick={handleReset} disabled={!selectedLink}>
-                    Reset ke Default
+                    Tampilkan Semua
                   </Button>
                 </Stack>
               </div>
               <div className="mt-3">
                 {!selectedLink ? (
-                  <div className="text-muted">Pilih link dashboard terlebih dulu.</div>
+                  <div className="text-muted">Pilih halaman dashboard di sebelah kiri terlebih dahulu.</div>
                 ) : (
                   <Row className="g-3">
                     <Col xs={12} md={6}>
@@ -298,7 +298,7 @@ const TemplatePage = () => {
                         <Form.Check
                           type="switch"
                           id="toggle-gauges"
-                          label="Gauge Cards"
+                          label="Kartu Indikator Sensor (Gauge Cards)"
                           checked={activeUi.gauges}
                           onChange={() => handleToggle('gauges')}
                         />
@@ -319,7 +319,7 @@ const TemplatePage = () => {
                         <Form.Check
                           type="switch"
                           id="toggle-chart"
-                          label="Chart Time Series"
+                          label="Grafik Tren (Chart Time Series)"
                           checked={activeUi.chart}
                           onChange={() => handleToggle('chart')}
                         />
@@ -330,7 +330,7 @@ const TemplatePage = () => {
                         <Form.Check
                           type="switch"
                           id="toggle-table"
-                          label="Table"
+                          label="Tabel Riwayat Data (Table)"
                           checked={activeUi.table}
                           onChange={() => handleToggle('table')}
                         />
@@ -351,14 +351,14 @@ const TemplatePage = () => {
                         <Form.Check
                           type="switch"
                           id="toggle-filter"
-                          label="Tombol Filter"
+                          label="Filter Rentang Waktu (1 Hari / 7 Hari / 1 Bulan)"
                           checked={activeUi.filterButtons}
                           onChange={() => handleToggle('filterButtons')}
                         />
                         <Form.Check
                           type="switch"
                           id="toggle-download"
-                          label="Tombol Download"
+                          label="Tombol Download Data (CSV / Excel)"
                           checked={activeUi.downloadButton}
                           onChange={() => handleToggle('downloadButton')}
                         />
@@ -373,9 +373,9 @@ const TemplatePage = () => {
             <Card.Body>
               <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                 <div>
-                  <Card.Title className="mb-1">Pratinjau Tata Letak</Card.Title>
+                  <Card.Title className="mb-1">Pratinjau Susunan Halaman</Card.Title>
                   <Card.Text className="mb-0">
-                    Representasi susunan komponen yang akan tampil pada halaman dashboard publik.
+                    Gambaran tata letak komponen yang akan dilihat pengunjung pada halaman dashboard Anda.
                   </Card.Text>
                 </div>
                 {selectedLink && (
@@ -391,14 +391,14 @@ const TemplatePage = () => {
                 )}
               </div>
               {!selectedLink ? (
-                <div className="text-muted">Pilih link untuk melihat pratinjau tata letak.</div>
+                <div className="text-muted">Pilih halaman untuk melihat pratinjau tata letak.</div>
               ) : (
                 <div className="template-preview mt-3">
                   <div className="template-preview__header">
                     <div>
                       <div className="template-preview__title">{selectedLink.name}</div>
                       <div className="template-preview__subtitle">
-                        {stationTemplates.find((t) => t.id === selectedLink.templateId)?.name || 'Station 2'}
+                        {getTemplateDisplayName(selectedLink.templateId)}
                       </div>
                     </div>
                     <Stack direction="horizontal" gap={2} className="flex-wrap">
@@ -422,13 +422,13 @@ const TemplatePage = () => {
                   )}
                   {activeUi.chart && (
                     <div className="template-preview__panel">
-                      <div className="template-preview__panel-title">Chart Time Series</div>
+                      <div className="template-preview__panel-title">Grafik Tren Parameter</div>
                       <div className="template-preview__chart" />
                     </div>
                   )}
                   {activeUi.table && (
                     <div className="template-preview__panel">
-                      <div className="template-preview__panel-title">Table</div>
+                      <div className="template-preview__panel-title">Tabel Riwayat Pembacaan</div>
                       <div className="template-preview__table">
                         <div className="template-preview__table-head">
                           {TABLE_COLUMNS.filter((item) => activeUi.tableColumns[item.key]).map((item) => (

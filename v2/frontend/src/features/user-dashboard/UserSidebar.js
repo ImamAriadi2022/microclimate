@@ -10,17 +10,17 @@ const UserSidebar = ({ basePath, isOpen }) => {
       end: true,
     },
     {
-      label: 'Konfigurasi Endpoint',
+      label: 'Sumber Data Sensor',
       to: `${basePath}/endpoint`,
       icon: FiSettings,
     },
     {
-      label: 'Dashboard Link',
+      label: 'Link Dashboard',
       to: `${basePath}/links`,
       icon: FiLink2,
     },
     {
-      label: 'Editor',
+      label: 'Atur Tampilan',
       to: `${basePath}/templates`,
       icon: FiGrid,
     },
@@ -28,7 +28,7 @@ const UserSidebar = ({ basePath, isOpen }) => {
 
   return (
     <aside className={`user-sidebar ${isOpen ? '' : 'is-collapsed'}`}>
-      <div className="user-sidebar__title">Menu Fitur</div>
+      <div className="user-sidebar__title">Menu Ruang Kerja</div>
       <nav>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -47,9 +47,6 @@ const UserSidebar = ({ basePath, isOpen }) => {
           );
         })}
       </nav>
-      {/* <div className="user-sidebar__note">
-        Mode simulasi aktif. Data disimpan lokal di browser.
-      </div> */}
     </aside>
   );
 };

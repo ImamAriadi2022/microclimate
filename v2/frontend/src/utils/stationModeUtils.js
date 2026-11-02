@@ -101,9 +101,21 @@ export function hasAnySensorValue(item, sensorKeys = []) {
 }
 
 /**
+ * Mengecek apakah baris data memiliki pembacaan sensor utama (suhu/kelembaban) yang benar-benar hidup (> 0),
+ * untuk menghindari baris saat sensor sedang mati dan mengirim angka 0 semua.
+ */
+function hasNonZeroPrimaryReading(item) {
+  if (!item) return false;
+  const hum = typeof item.humidity === 'number' && Number.isFinite(item.humidity) ? item.humidity : 0;
+  const temp = typeof item.temperature === 'number' && Number.isFinite(item.temperature) ? item.temperature : 0;
+  return hum > 0 || temp > 0;
+}
+
+/**
  * Mencari baris data aktif terakhir dari array data yang sudah diurutkan terbaru di atas.
- * Prioritas 1: Semua sensor utama (`primaryKeys`) bernilai numerik valid.
- * Prioritas 2 (Fallback): Minimal 1 sensor (`allSensorKeys`) bernilai numerik valid.
+ * Prioritas 1: Semua sensor utama (`primaryKeys`) bernilai numerik valid DAN suhu/kelembaban > 0.
+ * Prioritas 2: Minimal 1 sensor (`allSensorKeys`) bernilai numerik valid DAN suhu/kelembaban > 0.
+ * Prioritas 3 (Fallback): Baris dengan nilai numerik valid meskipun bernilai 0.
  */
 export function findLatestActiveRecord(
   rows,
@@ -119,6 +131,8 @@ export function findLatestActiveRecord(
   if (sorted.length === 0) return null;
 
   return (
+    sorted.find((row) => hasCompleteSensorValues(row, primaryKeys) && hasNonZeroPrimaryReading(row)) ||
+    sorted.find((row) => hasAnySensorValue(row, allSensorKeys) && hasNonZeroPrimaryReading(row)) ||
     sorted.find((row) => hasCompleteSensorValues(row, primaryKeys)) ||
     sorted.find((row) => hasAnySensorValue(row, allSensorKeys)) ||
     null

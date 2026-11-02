@@ -8,7 +8,6 @@ import {
     STATION_MODES,
     filterDataByModeRange,
     findLatestActiveRecord,
-    generateSimulatedRawRecords,
     hasAnySensorValue,
     parseFlexibleDate,
     parseFlexibleTimestamp,
@@ -229,7 +228,19 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
 
   const joinEndpointUrl = (baseUrl, customPath, fallbackPath) => {
     const cleanBase = String(baseUrl || '').trim().replace(/\/$/, '');
-    const rawPath = String(customPath || fallbackPath || '').trim();
+    const trimmedCustom = String(customPath || '').trim();
+    if (!trimmedCustom) {
+      try {
+        const parsedBase = new URL(cleanBase);
+        if (parsedBase.pathname && parsedBase.pathname !== '/') {
+          return cleanBase;
+        }
+      } catch (_e) {
+        // Ignore URL parse error and use fallback
+      }
+    }
+    const rawPath = trimmedCustom || String(fallbackPath || '').trim();
+    if (!rawPath) return cleanBase;
     const cleanPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
     return `${cleanBase}${cleanPath}`;
   };
@@ -314,13 +325,17 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     return response.json();
   };
 
-  const fetchPagedResult = async (baseUrl, sourceMode, filterType, startTime = null, endTime = null) => {
-    const pageLimit = sourceMode === STATION_MODES.SIMULATION ? 200 : 500;
+  const fetchPagedResult = async (baseUrl, _sourceMode, filterType, startTime = null, endTime = null) => {
+    const pageLimit = 500;
     const targetCount = getTargetRecordCount(filterType);
-    const maxPages = sourceMode === STATION_MODES.SIMULATION ? 8 : 12;
+    const maxPages = 12;
     const rows = [];
+    let foundLivePrimary = false;
 
-    for (let page = 0; page < maxPages && rows.length < targetCount; page += 1) {
+    for (let page = 0; page < maxPages; page += 1) {
+      if (rows.length >= targetCount && (foundLivePrimary || page >= 6)) {
+        break;
+      }
       const offset = page * pageLimit;
       const pagedUrl = buildPagedUrl(baseUrl, pageLimit, offset, startTime, endTime);
       const pageData = await fetchJsonOrThrow(pagedUrl);
@@ -336,6 +351,12 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
       if (chunk.length === 0) break;
       rows.push(...chunk);
 
+      if (!foundLivePrimary) {
+        foundLivePrimary = chunk.some(
+          (item) => Number(item?.humidity) > 0 || Number(item?.temperature) > 0
+        );
+      }
+
       if (chunk.length < pageLimit) break;
     }
 
@@ -343,7 +364,7 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
   };
 
   const fetchData = async (
-    targetMode = activeMode,
+    _targetMode = activeMode,
     filterType = filter,
     selectedStartTime = startDateTime,
     selectedEndTime = endDateTime
@@ -352,30 +373,18 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     latestRequestRef.current = requestId;
 
     setError(null);
-    const isSimulation = targetMode === STATION_MODES.SIMULATION;
 
     try {
-      let rawRows = [];
-
-      const startTime = !isSimulation && selectedStartTime
+      const startTime = selectedStartTime
         ? new Date(selectedStartTime).toISOString()
         : null;
-      const endTime = !isSimulation && selectedEndTime
+      const endTime = selectedEndTime
         ? new Date(selectedEndTime).toISOString()
         : null;
 
-      if (isSimulation) {
-        rawRows = generateSimulatedRawRecords({
-          filter: filterType,
-          startDateTime: selectedStartTime,
-          endDateTime: selectedEndTime,
-          stationSeed: 2,
-        });
-      } else {
-        const url = getApiUrl(filterType);
-        if (!url) throw new Error(`No API URL configured for filter: ${filterType}`);
-        rawRows = await fetchPagedResult(url, STATION_MODES.REALTIME, filterType, startTime, endTime);
-      }
+      const url = getApiUrl(filterType);
+      if (!url) throw new Error(`No API URL configured for filter: ${filterType}`);
+      const rawRows = await fetchPagedResult(url, STATION_MODES.REALTIME, filterType, startTime, endTime);
 
       if (requestId !== latestRequestRef.current) {
         return;
@@ -392,31 +401,18 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
         })
         .sort((a, b) => parseFlexibleDate(b.timestamp) - parseFlexibleDate(a.timestamp));
 
-      if (!isSimulation) {
-        cachedRealDataRef.current = mapped;
-        const latestActive = findLatestActiveRecord(mapped, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
-        if (latestActive || (!selectedStartTime && !selectedEndTime)) {
-          setLastActiveTimestamp(latestActive ? latestActive.timestamp : null);
-          setLastActiveGaugeData(
-            latestActive ? toGaugePayload(latestActive, EMPTY_GAUGE_DATA) : null
-          );
-        }
+      cachedRealDataRef.current = mapped;
+      const latestActive = findLatestActiveRecord(mapped, PRIMARY_SENSOR_KEYS, ALL_SENSOR_KEYS);
+      if (latestActive || (!selectedStartTime && !selectedEndTime)) {
+        setLastActiveTimestamp(latestActive ? latestActive.timestamp : null);
+        setLastActiveGaugeData(
+          latestActive ? toGaugePayload(latestActive, EMPTY_GAUGE_DATA) : null
+        );
       }
 
       setAllData(mapped);
     } catch (err) {
       if (requestId !== latestRequestRef.current) {
-        return;
-      }
-
-      if (isSimulation) {
-        const fallbackSim = generateSimulatedRawRecords({
-          filter: filterType,
-          startDateTime: selectedStartTime,
-          endDateTime: selectedEndTime,
-          stationSeed: 2,
-        }).map(mapApiData);
-        setAllData(fallbackSim);
         return;
       }
 
@@ -435,27 +431,19 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
   }, [filter, startDateTime, endDateTime, customConfig]);
 
   const handleModeChange = (nextMode) => {
-    if (nextMode === activeMode && nextMode !== STATION_MODES.SIMULATION) {
+    if (nextMode === activeMode) {
       return;
     }
-    const resolvedMode =
-      nextMode === STATION_MODES.SIMULATION && activeMode === STATION_MODES.SIMULATION
-        ? STATION_MODES.REALTIME
-        : nextMode;
 
-    setActiveMode(resolvedMode);
+    setActiveMode(nextMode);
 
-    if (
-      resolvedMode !== STATION_MODES.SIMULATION &&
-      activeMode !== STATION_MODES.SIMULATION &&
-      cachedRealDataRef.current.length > 0
-    ) {
+    if (cachedRealDataRef.current.length > 0) {
       setError(null);
       setAllData(cachedRealDataRef.current);
       return;
     }
 
-    fetchData(resolvedMode, filter, startDateTime, endDateTime);
+    fetchData(nextMode, filter, startDateTime, endDateTime);
   };
 
   useEffect(() => {
@@ -517,18 +505,14 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
   }, [activeMode, lastActiveGaugeData, realtimeGaugeData, startDateTime, endDateTime]);
 
   const modeLabel =
-    activeMode === STATION_MODES.SIMULATION
-      ? 'Simulasi'
-      : activeMode === STATION_MODES.LAST_ACTIVE
-        ? 'Terakhir Aktif'
-        : 'Realtime';
+    activeMode === STATION_MODES.LAST_ACTIVE
+      ? 'Terakhir Aktif'
+      : 'Realtime';
 
   const modeBadgeMod =
-    activeMode === STATION_MODES.SIMULATION
-      ? 'mc-mode-badge--simulation'
-      : activeMode === STATION_MODES.LAST_ACTIVE
-        ? 'mc-mode-badge--last-active'
-        : 'mc-mode-badge--realtime';
+    activeMode === STATION_MODES.LAST_ACTIVE
+      ? 'mc-mode-badge--last-active'
+      : 'mc-mode-badge--realtime';
 
   return (
     <section className="mc-custom-station">
@@ -584,13 +568,6 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
               disabled={!lastActiveGaugeData}
             >
               Mode Terakhir Aktif
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${activeMode === STATION_MODES.SIMULATION ? 'btn-warning' : 'btn-outline-warning'}`}
-              onClick={() => handleModeChange(STATION_MODES.SIMULATION)}
-            >
-              Mode Simulasi {activeMode === STATION_MODES.SIMULATION ? 'ON' : 'OFF'}
             </button>
           </div>
           {activeUi.downloadButton && (

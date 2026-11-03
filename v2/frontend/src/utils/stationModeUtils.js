@@ -26,9 +26,85 @@ const COMPASS_DIRECTIONS_EN = [
   'Northwest',
 ];
 
+export const TIMESTAMP_CANDIDATE_KEYS = [
+  'timestamp',
+  'recorded_at',
+  'recordedAt',
+  'created_at',
+  'createdAt',
+  'datetime',
+  'date_time',
+  'dateTime',
+  'time',
+  'date',
+  'updated_at',
+  'updatedAt',
+  'reading_time',
+  'readingTime',
+  'measured_at',
+  'measuredAt',
+  'waktu',
+  'tanggal',
+  'ts',
+];
+
+export const SENSOR_FIELD_SPECS = [
+  {
+    key: 'timestamp',
+    label: 'Waktu Pencatatan (Timestamp)',
+    possibleKeys: TIMESTAMP_CANDIDATE_KEYS,
+    required: true,
+  },
+  {
+    key: 'humidity',
+    label: 'Kelembaban Udara',
+    possibleKeys: ['humidity', 'hum', 'hum_dht22', 'kelembaban', 'rh', 'relative_humidity', 'relativeHumidity'],
+  },
+  {
+    key: 'temperature',
+    label: 'Suhu Udara',
+    possibleKeys: ['temperature', 'temp', 'temp_dht22', 'suhu', 'suhu_udara', 'air_temperature', 'airTemperature'],
+  },
+  {
+    key: 'rainfall',
+    label: 'Curah Hujan',
+    possibleKeys: ['rainfall', 'rain', 'curah_hujan', 'precipitation', 'rain_rate', 'rainRate'],
+  },
+  {
+    key: 'windSpeed',
+    label: 'Kecepatan Angin',
+    possibleKeys: ['windSpeed', 'windspeed', 'wind_speed', 'kecepatan_angin', 'wind', 'ws'],
+  },
+  {
+    key: 'irradiation',
+    label: 'Radiasi Matahari',
+    possibleKeys: ['pyrano', 'irradiation', 'radiasi', 'solar', 'solar_radiation', 'solarRadiation', 'irradiance', 'light', 'lux'],
+  },
+  {
+    key: 'direction',
+    label: 'Arah Mata Angin (Teks)',
+    possibleKeys: ['direction', 'windDirection', 'wind_direction', 'arah_angin', 'wind_dir', 'windDir'],
+  },
+  {
+    key: 'angle',
+    label: 'Sudut Arah Angin (°)',
+    possibleKeys: ['angle', 'windAngle', 'wind_angle', 'sudut_angin', 'wind_deg', 'windDeg', 'wd'],
+  },
+  {
+    key: 'airPressure',
+    label: 'Tekanan Udara',
+    possibleKeys: ['AirPressure', 'airPressure', 'airpressure', 'air_pressure', 'tekanan_udara', 'pressure', 'barometric_pressure'],
+  },
+  {
+    key: 'bmpTemperature',
+    label: 'Suhu Alat / Cadangan',
+    possibleKeys: ['bmpTemperature', 'bmptemperature', 'bmp_temperature', 'suhuAir', 'waterTemperature', 'water_temperature', 'temp2', 'temperature2'],
+  },
+];
+
 /**
- * Mengonversi berbagai format timestamp (termasuk "DD-MM-YY HH:mm:ss" atau ISO string)
- * menjadi string yang dapat di-parse oleh `new Date()`.
+ * Mengonversi berbagai format timestamp (termasuk "YYYY-MM-DD HH:mm:ss", "DD-MM-YY HH:mm:ss",
+ * Unix epoch detik/milidetik, atau ISO string) menjadi string yang dapat di-parse oleh `new Date()`.
  */
 export function parseFlexibleTimestamp(ts) {
   if (ts === undefined || ts === null || ts === '') return '';
@@ -36,7 +112,8 @@ export function parseFlexibleTimestamp(ts) {
     return Number.isNaN(ts.getTime()) ? '' : ts.toISOString();
   }
   if (typeof ts === 'number') {
-    const d = new Date(ts);
+    const ms = ts >= 946684800 && ts < 10000000000 ? ts * 1000 : ts;
+    const d = new Date(ms);
     return Number.isNaN(d.getTime()) ? '' : d.toISOString();
   }
   if (typeof ts !== 'string') return String(ts);
@@ -46,12 +123,37 @@ export function parseFlexibleTimestamp(ts) {
     return trimmed;
   }
 
-  // Format: "28-07-25 06:30:00" atau "28-07-2025 06:30:00"
+  // Jika string murni angka Unix epoch (10 digit detik atau 13 digit milidetik)
+  if (/^\d{10}(\d{3})?$/.test(trimmed)) {
+    const num = Number(trimmed);
+    const ms = trimmed.length === 10 ? num * 1000 : num;
+    const d = new Date(ms);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toISOString();
+    }
+  }
+
+  // Format SQL / ISO dengan spasi atau garis miring: "2026-10-04 08:02:06" atau "2026/10/04 08:02"
+  const ymdMatch = trimmed.match(
+    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2})(?:\.(\d+))?)?(Z|[+-]\d{2}:?\d{2})?$/
+  );
+  if (ymdMatch) {
+    const [, yyyy, mmRaw, ddRaw, hRaw, mRaw, sRaw = '00', msRaw = '', tzRaw = ''] = ymdMatch;
+    const mm = mmRaw.padStart(2, '0');
+    const dd = ddRaw.padStart(2, '0');
+    const hh = hRaw.padStart(2, '0');
+    const mi = mRaw.padStart(2, '0');
+    const ss = sRaw.padStart(2, '0');
+    const frac = msRaw ? `.${msRaw}` : '';
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}${frac}${tzRaw}`;
+  }
+
+  // Format: "28-07-25 06:30:00" atau "28-07-2025 06:30:00" atau "28/07/2025 06:30:00"
   const customMatch = trimmed.match(
-    /^(\d{1,2})-(\d{1,2})-(\d{2,4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})$/
+    /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})[T\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/
   );
   if (customMatch) {
-    const [, ddRaw, mmRaw, yyRaw, hRaw, mRaw, sRaw] = customMatch;
+    const [, ddRaw, mmRaw, yyRaw, hRaw, mRaw, sRaw = '00'] = customMatch;
     const dd = ddRaw.padStart(2, '0');
     const mm = mmRaw.padStart(2, '0');
     const yyyy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
@@ -74,6 +176,94 @@ export function parseFlexibleDate(ts) {
   }
   const d = new Date(normalized);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Mencari kolom waktu pada objek data API secara fleksibel (mencakup `timestamp`, `recorded_at`, `created_at`, dll.).
+ */
+export function extractTimestampField(item) {
+  if (!item || typeof item !== 'object') return null;
+
+  for (const key of TIMESTAMP_CANDIDATE_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(item, key)) {
+      const rawVal = item[key];
+      const normalized = parseFlexibleTimestamp(rawVal);
+      if (normalized && (normalized === 'alat rusak' || parseFlexibleDate(normalized) !== null)) {
+        return { key, rawValue: rawVal, timestamp: normalized };
+      }
+    }
+  }
+
+  // Fallback auto-detect: cari properti yang namanya mengandung kata waktu/tanggal (selain uptime)
+  const fallbackKey = Object.keys(item).find((k) => {
+    if (/uptime|status|state|id$/i.test(k)) return false;
+    if (!/(time|date|_at$|At$|waktu|tanggal|tgl)/i.test(k)) return false;
+    const val = item[k];
+    if (typeof val !== 'string' && typeof val !== 'number') return false;
+    return parseFlexibleDate(val) !== null;
+  });
+
+  if (fallbackKey) {
+    const rawVal = item[fallbackKey];
+    return {
+      key: fallbackKey,
+      rawValue: rawVal,
+      timestamp: parseFlexibleTimestamp(rawVal),
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Mencari nilai kolom sensor dari objek data API berdasarkan definisi `SENSOR_FIELD_SPECS`.
+ */
+export function extractSensorField(item, specKey) {
+  if (!item || typeof item !== 'object') return null;
+  if (specKey === 'timestamp') {
+    const tsInfo = extractTimestampField(item);
+    return tsInfo ? { key: tsInfo.key, value: tsInfo.rawValue, normalized: tsInfo.timestamp } : null;
+  }
+
+  const spec = SENSOR_FIELD_SPECS.find((s) => s.key === specKey);
+  if (!spec) return null;
+
+  const foundKey = spec.possibleKeys.find((k) => Object.prototype.hasOwnProperty.call(item, k));
+  if (!foundKey) return null;
+
+  return {
+    key: foundKey,
+    value: item[foundKey],
+  };
+}
+
+/**
+ * Mengekstrak array baris data dari berbagai variasi pembungkus JSON API.
+ */
+export function extractArrayFromApiResponse(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return null;
+
+  const candidateArrays = [
+    payload.result,
+    payload.data?.result,
+    payload.data?.rows,
+    payload.data?.readings,
+    payload.data?.items,
+    payload.data,
+    payload.readings,
+    payload.rows,
+    payload.items,
+    payload.records,
+  ];
+
+  for (const candidate of candidateArrays) {
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 /**

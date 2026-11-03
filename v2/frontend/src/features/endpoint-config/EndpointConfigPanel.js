@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, Form, ListGroup, Row, Stack } from 'react-bootstrap';
 import {
+  SENSOR_FIELD_SPECS,
+  extractArrayFromApiResponse,
+  extractSensorField,
+} from '../../utils/stationModeUtils';
+import {
   getTemplateById,
   getTemplateDisplayName,
   stationTemplates,
@@ -41,38 +46,28 @@ const validateBackendResponse = (rows) => {
   }
 
   const firstItem = rows[0];
-  const fieldSpecs = [
-    { key: 'timestamp', label: 'Waktu Pencatatan (Timestamp)', possibleKeys: ['timestamp', 'time', 'created_at', 'date', 'datetime'], required: true },
-    { key: 'humidity', label: 'Kelembaban Udara', possibleKeys: ['humidity', 'hum', 'hum_dht22', 'kelembaban'] },
-    { key: 'temperature', label: 'Suhu Udara', possibleKeys: ['temperature', 'temp', 'temp_dht22', 'suhu'] },
-    { key: 'rainfall', label: 'Curah Hujan', possibleKeys: ['rainfall', 'rain', 'curah_hujan'] },
-    { key: 'windSpeed', label: 'Kecepatan Angin', possibleKeys: ['windSpeed', 'windspeed', 'wind_speed', 'kecepatan_angin'] },
-    { key: 'irradiation', label: 'Radiasi Matahari', possibleKeys: ['pyrano', 'irradiation', 'radiasi', 'solar'] },
-    { key: 'direction', label: 'Arah Mata Angin (Teks)', possibleKeys: ['direction', 'windDirection', 'wind_direction', 'arah_angin'] },
-    { key: 'angle', label: 'Sudut Arah Angin (°)', possibleKeys: ['angle', 'windAngle', 'wind_angle', 'sudut_angin'] },
-    { key: 'airPressure', label: 'Tekanan Udara', possibleKeys: ['AirPressure', 'airPressure', 'airpressure', 'air_pressure', 'tekanan_udara'] },
-    { key: 'bmpTemperature', label: 'Suhu Alat / Cadangan', possibleKeys: ['bmpTemperature', 'bmptemperature', 'bmp_temperature', 'suhuAir', 'waterTemperature'] },
-  ];
 
-  const fieldsResult = fieldSpecs.map((spec) => {
-    const foundKey = spec.possibleKeys.find((k) => Object.prototype.hasOwnProperty.call(firstItem, k));
+  const fieldsResult = SENSOR_FIELD_SPECS.map((spec) => {
+    const match = extractSensorField(firstItem, spec.key);
     return {
       key: spec.key,
       label: spec.label,
       required: Boolean(spec.required),
-      status: foundKey ? 'ok' : 'missing',
-      foundKey: foundKey || null,
-      value: foundKey ? firstItem[foundKey] : null,
+      status: match ? 'ok' : 'missing',
+      foundKey: match ? match.key : null,
+      value: match ? match.value : null,
     };
   });
 
-  const hasTimestamp = fieldsResult.find((f) => f.key === 'timestamp')?.status === 'ok';
+  const timestampField = fieldsResult.find((f) => f.key === 'timestamp');
+  const hasTimestamp = timestampField?.status === 'ok';
   const sensorFields = fieldsResult.filter((f) => !f.required);
   const detectedCount = sensorFields.filter((f) => f.status === 'ok').length;
 
   return {
     validFormat: true,
     hasTimestamp,
+    timestampField,
     fields: fieldsResult,
     sensorFields,
     detectedCount,
@@ -80,12 +75,37 @@ const validateBackendResponse = (rows) => {
   };
 };
 
+const splitFullEndpointUrl = (rawUrl) => {
+  try {
+    const parsed = new URL(String(rawUrl || '').trim());
+    if (!parsed.pathname || parsed.pathname === '/') {
+      return null;
+    }
+    const params = new URLSearchParams(parsed.search);
+    params.delete('limit');
+    params.delete('offset');
+    const queryStr = params.toString();
+    return {
+      origin: parsed.origin,
+      pathWithQuery: queryStr ? `${parsed.pathname}?${queryStr}` : parsed.pathname,
+    };
+  } catch (_e) {
+    return null;
+  }
+};
+
 const buildResolvedTestUrl = (baseUrl, customPath) => {
   const cleanBase = String(baseUrl || '').trim().replace(/\/$/, '');
   const cleanPath = String(customPath || '').trim().replace(/^\//, '');
   if (!cleanBase) return '';
   const combined = cleanPath ? `${cleanBase}/${cleanPath}` : cleanBase;
-  return combined.includes('?') ? `${combined}&limit=5` : `${combined}?limit=5`;
+  try {
+    const parsed = new URL(combined);
+    parsed.searchParams.set('limit', '5');
+    return parsed.toString();
+  } catch (_e) {
+    return combined.includes('?') ? `${combined}&limit=5` : `${combined}?limit=5`;
+  }
 };
 
 const EndpointConfigPanel = () => {
@@ -200,19 +220,14 @@ const EndpointConfigPanel = () => {
   };
 
   const handleBaseUrlBlur = () => {
-    const raw = baseUrl.trim();
-    if (!raw) return;
-    try {
-      const parsed = new URL(raw);
-      if (parsed.pathname && parsed.pathname !== '/' && !(endpointMap.topic5History || '').trim()) {
-        setBaseUrl(parsed.origin);
-        setEndpointMap((prev) => ({
-          ...prev,
-          topic5History: parsed.pathname,
-        }));
-      }
-    } catch (_e) {
-      // Biarkan apa adanya jika bukan URL penuh
+    if ((endpointMap.topic5History || '').trim()) return;
+    const split = splitFullEndpointUrl(baseUrl);
+    if (split) {
+      setBaseUrl(split.origin);
+      setEndpointMap((prev) => ({
+        ...prev,
+        topic5History: split.pathWithQuery,
+      }));
     }
   };
 
@@ -237,15 +252,11 @@ const EndpointConfigPanel = () => {
     let finalBaseUrl = baseUrl.trim();
     const currentEndpointMap = { ...endpointMap };
 
-    if (type === 'backend') {
-      try {
-        const parsed = new URL(finalBaseUrl);
-        if (parsed.pathname && parsed.pathname !== '/' && !(currentEndpointMap.topic5History || '').trim()) {
-          finalBaseUrl = parsed.origin;
-          currentEndpointMap.topic5History = parsed.pathname;
-        }
-      } catch (_e) {
-        // Ignore
+    if (type === 'backend' && !(currentEndpointMap.topic5History || '').trim()) {
+      const split = splitFullEndpointUrl(finalBaseUrl);
+      if (split) {
+        finalBaseUrl = split.origin;
+        currentEndpointMap.topic5History = split.pathWithQuery;
       }
     }
 
@@ -390,14 +401,7 @@ const EndpointConfigPanel = () => {
       }
 
       const data = await response.json();
-
-      const rows = Array.isArray(data?.result)
-        ? data.result
-        : Array.isArray(data?.data?.result)
-          ? data.data.result
-          : Array.isArray(data)
-            ? data
-            : null;
+      const rows = extractArrayFromApiResponse(data);
 
       const validation = validateBackendResponse(rows);
       const sampleRecord = rows && rows.length > 0 ? rows[0] : data;
@@ -519,15 +523,21 @@ const EndpointConfigPanel = () => {
 
                   {testResult.validation.validFormat ? (
                     <>
-                      <div className="d-flex align-items-center justify-content-between py-2 px-2 rounded bg-light mb-2">
+                      <div className="d-flex align-items-center justify-content-between py-2 px-2 rounded bg-light mb-2 gap-2">
                         <div>
                           <div className="fw-semibold small">Waktu Pencatatan (Timestamp)</div>
                           <div className="text-muted" style={{ fontSize: '0.75rem' }}>
                             Wajib ada untuk menampilkan grafik & riwayat waktu
                           </div>
                         </div>
-                        <Badge bg={testResult.validation.hasTimestamp ? 'success' : 'danger'}>
-                          {testResult.validation.hasTimestamp ? 'Tersedia' : 'Tidak Ditemukan'}
+                        <Badge
+                          bg={testResult.validation.hasTimestamp ? 'success' : 'danger'}
+                          className="text-truncate"
+                          style={{ maxWidth: '210px' }}
+                        >
+                          {testResult.validation.hasTimestamp
+                            ? `${testResult.validation.timestampField.foundKey}: ${formatSampleValue(testResult.validation.timestampField.value)}`
+                            : 'Tidak Ditemukan'}
                         </Badge>
                       </div>
 

@@ -559,15 +559,43 @@ describe('Integrasi Frontend v2 dengan User Backend & Konsistensi UI', () => {
     expect(screen.queryByText(/Station 2 — Microclimate Lengkap/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Stasiun Cuaca & Iklim Lengkap \(Maks\. 8 Sensor\)/i)).toBeInTheDocument();
 
-    // Ketika pengguna menempelkan URL lengkap ke Alamat Server API, otomatis memisahkan origin dan path
+    // Ketika pengguna menempelkan URL lengkap (termasuk query string) ke Alamat Server API, otomatis memisahkan origin dan path
     const baseUrlInput = screen.getByLabelText(/Alamat Server API/i);
     fireEvent.change(baseUrlInput, {
-      target: { value: 'https://api-sensor.contoh.id/v1/telemetry' },
+      target: { value: 'https://202.155.17.57/api/readings?room=lab_td&range=30d&limit=100' },
     });
     fireEvent.blur(baseUrlInput);
 
-    expect(baseUrlInput.value).toBe('https://api-sensor.contoh.id');
+    expect(baseUrlInput.value).toBe('https://202.155.17.57');
     const pathInput = screen.getByLabelText(/Path Endpoint Data Sensor/i);
-    expect(pathInput.value).toBe('/v1/telemetry');
+    expect(pathInput.value).toBe('/api/readings?room=lab_td&range=30d');
+
+    // Uji tes koneksi terhadap API eksternal dengan kolom waktu `recorded_at` berformat "YYYY-MM-DD HH:mm:ss" dan `wind_speed`
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [
+        {
+          id: 837,
+          temperature: 26.3,
+          humidity: 50.5,
+          wind_speed: 0.7,
+          co2: 459,
+          recorded_at: '2026-10-04 08:02:06',
+          room: 'lab_td',
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Tes Koneksi Sekarang/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Koneksi Berhasil Terhubung!/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/recorded_at: 2026-10-04 08:02:06/i)).toBeInTheDocument();
+    expect(screen.getByText(/humidity: 50.5/i)).toBeInTheDocument();
+    expect(screen.getByText(/temperature: 26.3/i)).toBeInTheDocument();
+    expect(screen.getByText(/wind_speed: 0.7/i)).toBeInTheDocument();
   });
 });

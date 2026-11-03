@@ -6,11 +6,13 @@ import {
 } from '../../config/apiEndpoints';
 import {
     STATION_MODES,
+    extractArrayFromApiResponse,
+    extractSensorField,
+    extractTimestampField,
     filterDataByModeRange,
     findLatestActiveRecord,
     hasAnySensorValue,
     parseFlexibleDate,
-    parseFlexibleTimestamp,
     toGaugePayload,
 } from '../../utils/stationModeUtils';
 import DataDownloadModal from '../DataDownloadModal';
@@ -111,6 +113,12 @@ const ALL_SENSOR_KEYS = [
   'airpressure',
 ];
 
+const readNumericSensor = (item, specKey) => {
+  const match = extractSensorField(item, specKey);
+  if (!match) return 'alat rusak';
+  return isValidValue(match.value) ? Number(match.value) : 'alat rusak';
+};
+
 const mapApiData = (item) => {
   if (!item) {
     return {
@@ -126,7 +134,8 @@ const mapApiData = (item) => {
       airpressure: 'error',
     };
   }
-  const ts = parseFlexibleTimestamp(item.timestamp);
+  const tsField = extractTimestampField(item);
+  const ts = tsField ? tsField.timestamp : '';
   if (ts === undefined || ts === null || ts === '') {
     return {
       timestamp: 'alat rusak',
@@ -141,27 +150,18 @@ const mapApiData = (item) => {
       airpressure: 'alat rusak',
     };
   }
+  const dirField = extractSensorField(item, 'direction');
   return {
     timestamp: ts,
-    humidity: isValidValue(item.humidity) ? Number(item.humidity) : 'alat rusak',
-    temperature: isValidValue(item.temperature) ? Number(item.temperature) : 'alat rusak',
-    rainfall: isValidValue(item.rainfall) ? Number(item.rainfall) : 'alat rusak',
-    windspeed: isValidValue(item.windSpeed ?? item.windspeed ?? item.wind_speed)
-      ? Number(item.windSpeed ?? item.windspeed ?? item.wind_speed)
-      : 'alat rusak',
-    irradiation: isValidValue(item.pyrano)
-      ? Number(item.pyrano)
-      : isValidValue(item.irradiation)
-        ? Number(item.irradiation)
-        : 'alat rusak',
-    windDirection: windDirectionToEnglish(item.direction ?? item.windDirection ?? ''),
-    angle: isValidValue(item.angle) ? Number(item.angle) : 'alat rusak',
-    bmptemperature: isValidValue(item.bmpTemperature ?? item.bmptemperature)
-      ? Number(item.bmpTemperature ?? item.bmptemperature)
-      : 'alat rusak',
-    airpressure: isValidValue(item.AirPressure ?? item.airPressure ?? item.airpressure)
-      ? Number(item.AirPressure ?? item.airPressure ?? item.airpressure)
-      : 'alat rusak',
+    humidity: readNumericSensor(item, 'humidity'),
+    temperature: readNumericSensor(item, 'temperature'),
+    rainfall: readNumericSensor(item, 'rainfall'),
+    windspeed: readNumericSensor(item, 'windSpeed'),
+    irradiation: readNumericSensor(item, 'irradiation'),
+    windDirection: windDirectionToEnglish(dirField ? String(dirField.value ?? '') : ''),
+    angle: readNumericSensor(item, 'angle'),
+    bmptemperature: readNumericSensor(item, 'bmpTemperature'),
+    airpressure: readNumericSensor(item, 'airPressure'),
   };
 };
 
@@ -331,6 +331,7 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
     const maxPages = 12;
     const rows = [];
     let foundLivePrimary = false;
+    let prevFirstSignature = null;
 
     for (let page = 0; page < maxPages; page += 1) {
       if (rows.length >= targetCount && (foundLivePrimary || page >= 6)) {
@@ -340,20 +341,25 @@ const Station2 = ({ customConfig, customTitle, uiSettings = DEFAULT_UI }) => {
       const pagedUrl = buildPagedUrl(baseUrl, pageLimit, offset, startTime, endTime);
       const pageData = await fetchJsonOrThrow(pagedUrl);
 
-      const chunk = Array.isArray(pageData?.result)
-        ? pageData.result
-        : Array.isArray(pageData?.data?.result)
-          ? pageData.data.result
-          : Array.isArray(pageData)
-            ? pageData
-            : [];
+      const chunk = extractArrayFromApiResponse(pageData) || [];
 
       if (chunk.length === 0) break;
+
+      const currentFirstSignature = JSON.stringify(chunk[0]);
+      if (prevFirstSignature && currentFirstSignature === prevFirstSignature) {
+        break;
+      }
+      prevFirstSignature = currentFirstSignature;
+
       rows.push(...chunk);
 
       if (!foundLivePrimary) {
         foundLivePrimary = chunk.some(
-          (item) => Number(item?.humidity) > 0 || Number(item?.temperature) > 0
+          (item) => {
+            const hum = extractSensorField(item, 'humidity');
+            const temp = extractSensorField(item, 'temperature');
+            return Number(hum?.value) > 0 || Number(temp?.value) > 0;
+          }
         );
       }
 

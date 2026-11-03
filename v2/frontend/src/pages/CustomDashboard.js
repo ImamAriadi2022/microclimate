@@ -71,7 +71,8 @@ const readStoredUiForLink = (link) => {
 const CustomDashboard = () => {
   const navigate = useNavigate();
   const { username = 'user', template, slug } = useParams();
-  const templateInfo = useMemo(() => getTemplateById(template), [template]);
+  const effectiveTemplate = template || 'station2';
+  const templateInfo = useMemo(() => getTemplateById(effectiveTemplate), [effectiveTemplate]);
   const [linkData, setLinkData] = useState(null);
   const [configData, setConfigData] = useState(null);
   const [uiSettings, setUiSettings] = useState(DEFAULT_UI);
@@ -90,7 +91,7 @@ const CustomDashboard = () => {
       try {
         const parsedLinks = JSON.parse(savedLinks);
         const foundLink = parsedLinks.find(
-          (item) => item.slug === slug && item.templateId === template
+          (item) => item.slug === slug && (!template || item.templateId === template)
         );
         setLinkData(foundLink || null);
         setUiSettings(readStoredUiForLink(foundLink));
@@ -111,7 +112,7 @@ const CustomDashboard = () => {
     };
 
     setIsLoading(true);
-    fetchPublicDashboardLink(username, template, slug)
+    fetchPublicDashboardLink(username, effectiveTemplate, slug)
       .then((data) => {
         if (cancelled) return;
         const remoteLink = data.link || null;
@@ -129,7 +130,7 @@ const CustomDashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [slug, template, username]);
+  }, [slug, template, effectiveTemplate, username]);
 
   const isPublished = Boolean(linkData?.published);
   const loggedInUsername = localStorage.getItem('mc_v2_username') || '';
@@ -195,7 +196,7 @@ const CustomDashboard = () => {
               <div>
                 <Card.Title>{linkData?.name || 'Dashboard Custom'}</Card.Title>
                 <Card.Text className="text-muted">
-                  Template: {templateInfo?.name || template}
+                  Template: {templateInfo?.name || effectiveTemplate}
                 </Card.Text>
               </div>
               <Badge bg={isPublished ? 'success' : 'secondary'}>

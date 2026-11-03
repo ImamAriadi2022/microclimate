@@ -436,8 +436,9 @@ describe('Integrasi Frontend v2 dengan User Backend & Konsistensi UI', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/imam/station2/kebun-c']}>
+      <MemoryRouter initialEntries={['/imam/kebun-c']}>
         <Routes>
+          <Route path="/:username/:slug" element={<CustomDashboard />} />
           <Route path="/:username/:template/:slug" element={<CustomDashboard />} />
         </Routes>
       </MemoryRouter>

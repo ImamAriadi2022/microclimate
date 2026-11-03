@@ -122,7 +122,7 @@ const TemplatePage = () => {
     }
   }, []);
 
-  const buildPreviewLink = (templateId, slug) => `/${activeUsername}/${templateId}/${slug}`;
+  const buildPreviewLink = (_templateId, slug) => `/${activeUsername}/${slug}`;
 
   const selectedLink = useMemo(
     () => links.find((item) => item.id === selectedId) || null,

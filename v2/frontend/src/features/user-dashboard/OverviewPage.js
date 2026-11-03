@@ -246,12 +246,12 @@ const OverviewPage = ({ basePath, displayName }) => {
                       <div className="text-truncate me-2">
                         <div className="fw-semibold small text-truncate">{item.name}</div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          /{activeUsername}/{item.templateId}/{item.slug}
+                          /{activeUsername}/{item.slug}
                         </div>
                       </div>
                       <Button
                         as={Link}
-                        to={`/${activeUsername}/${item.templateId}/${item.slug}`}
+                        to={`/${activeUsername}/${item.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         variant="outline-primary"

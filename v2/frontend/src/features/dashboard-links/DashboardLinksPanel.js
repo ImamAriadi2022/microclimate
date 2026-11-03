@@ -39,8 +39,8 @@ const DashboardLinksPanel = () => {
   const [configId, setConfigId] = useState('');
   const [status, setStatus] = useState({ type: 'info', message: '' });
 
-  const buildPreviewLink = (tplId, itemSlug) => {
-    return `/${activeUsername}/${tplId}/${itemSlug}`;
+  const buildPreviewLink = (_tplId, itemSlug) => {
+    return `/${activeUsername}/${itemSlug}`;
   };
 
   useEffect(() => {
@@ -151,10 +151,13 @@ const DashboardLinksPanel = () => {
       setStatus({ type: 'danger', message: 'Nama dashboard wajib diisi.' });
       return;
     }
-    if (!slugPattern.test(cleanSlug)) {
+    if (!slugPattern.test(cleanSlug) || cleanSlug === 'dashboard') {
       setStatus({
         type: 'danger',
-        message: 'Alamat singkat (Slug) harus terdiri dari 3–45 karakter huruf kecil, angka, atau tanda hubung (-).',
+        message:
+          cleanSlug === 'dashboard'
+            ? 'Slug "dashboard" dicadangkan untuk sistem. Silakan gunakan nama/slug lain.'
+            : 'Alamat singkat (Slug) harus terdiri dari 3–45 karakter huruf kecil, angka, atau tanda hubung (-).',
       });
       return;
     }
